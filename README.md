@@ -153,6 +153,36 @@ JWT_SECRET=your_jwt_secret (You don't need this for now)
 
 Never commit `.env` to Git.
 
+---
+
+# Running Database Migrations
+
+This project includes a SQL schema file that defines the database structure.
+
+Tables created:
+
+- users
+- drafts
+- generated_posts
+- usage_events
+
+Run the migration script:
+
+```
+npm run migrate
+```
+
+or
+
+```
+node src/db/migrate.js
+```
+
+This will execute the SQL inside:
+
+```
+src/db/schema.sql
+```
 
 ---
 
