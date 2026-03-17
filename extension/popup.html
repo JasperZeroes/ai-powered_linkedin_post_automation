@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LinkedIn AI Post Generator</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <div class="container">
+    <!-- Auth Landing View -->
+    <div id="authChoiceView" class="view">
+      <div class="brand-block">
+        <h2>Welcome</h2>
+        <p class="subtitle">
+          Sign up or log in to continue to your LinkedIn AI Post Generator.
+        </p>
+      </div>
+
+      <button id="showSignupBtn">Create Account</button>
+      <button id="showLoginBtn" class="secondary-btn">Login</button>
+    </div>
+
+    <!-- Signup View -->
+    <div id="signupView" class="view hidden">
+      <div class="top-row">
+        <button id="backFromSignup" class="text-btn">← Back</button>
+      </div>
+
+      <h2>Create Account</h2>
+
+      <label for="signupName">Full Name</label>
+      <input type="text" id="signupName" placeholder="Enter your full name" />
+
+      <label for="signupEmail">Email</label>
+      <input type="email" id="signupEmail" placeholder="Enter your email" />
+
+      <label for="signupPassword">Password</label>
+      <input
+        type="password"
+        id="signupPassword"
+        placeholder="Create a password"
+      />
+
+      <button id="signupBtn">Sign Up</button>
+
+      <p class="switch-text">
+        Already have an account?
+        <span id="goToLoginFromSignup">Login</span>
+      </p>
+    </div>
+
+    <!-- Login View -->
+    <div id="loginView" class="view hidden">
+      <div class="top-row">
+        <button id="backFromLogin" class="text-btn">← Back</button>
+      </div>
+
+      <h2>Login</h2>
+
+      <label for="loginEmail">Email</label>
+      <input type="email" id="loginEmail" placeholder="Enter your email" />
+
+      <label for="loginPassword">Password</label>
+      <input
+        type="password"
+        id="loginPassword"
+        placeholder="Enter your password"
+      />
+
+      <button id="loginBtn">Login</button>
+
+      <p class="switch-text">
+        Don’t have an account?
+        <span id="goToSignupFromLogin">Create one</span>
+      </p>
+    </div>
+
+    <!-- Generator View -->
+    <div id="generatorView" class="view hidden">
+      <h2>LinkedIn AI Post Generator</h2>
+
+      <label for="prompt">Prompt</label>
+      <textarea id="prompt" placeholder="What do you want to post about?"></textarea>
+
+      <label for="tone">Tone</label>
+      <select id="tone">
+        <option value="professional">Professional</option>
+        <option value="friendly">Friendly</option>
+        <option value="confident">Confident</option>
+        <option value="reflective">Reflective</option>
+
+        <option value="motivational">Motivational</option>
+        <option value="educational">Educational</option>
+        <option value="storytelling">Storytelling</option>
+
+        <option value="authentic">Authentic</option>
+        <option value="persuasive">Persuasive</option>
+        <option value="thoughtful">Thoughtful</option>
+
+      </select>
+
+      <label for="goal">Goal</label>
+      <select id="goal">
+        <option value="thought leadership">Thought Leadership</option>
+        <option value="project showcase">Project Showcase</option>
+        <option value="career lesson">Career Lesson</option>
+        <option value="personal branding">Personal Branding</option>
+
+        <option value="share learning">Share Learning</option>
+        <option value="build audience">Build Audience</option>
+        <option value="increase engagement">Increase Engagement</option>
+
+        <option value="promote service">Promote Service</option>
+        <option value="announce launch">Product Launch</option>
+        <option value="industry insight">Industry Insight</option>
+
+      </select>
+
+      <button id="generateBtn">Generate Post</button>
+
+      <label for="output">Generated Post</label>
+      <textarea id="output" placeholder="Your generated post will appear here"></textarea>
+
+      <div class="actions">
+        <button id="saveDraftBtn">Save as Draft</button>
+        <button id="copyBtn">Copy</button>
+        <button id="insertBtn">Insert into LinkedIn</button>
+      </div>
+    </div>
+
+    <p id="message"></p>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
