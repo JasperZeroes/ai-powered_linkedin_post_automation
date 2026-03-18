@@ -3,6 +3,8 @@ const cors = require("cors");
 const helmet = require("helmet");
 const postRoutes = require("./routes/postRoutes");
 const errorHandler = require("./middlewares/errorHandler");
+const authRoutes = require("./routes/authRoutes");
+const authMiddleware = require("./middlewares/authMiddleware");
 
 const app = express();
 
@@ -28,7 +30,8 @@ app.get("/health", (req, res) => {
   res.json({ success: true, message: "Server is running" });
 });
 
-app.use("/api/posts", postRoutes);
+app.use("/api/posts", authMiddleware, postRoutes);
+app.use("/api/auth", authRoutes);
 
 app.use(errorHandler);
 
