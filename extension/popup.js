@@ -5,6 +5,8 @@ const promptInput = document.getElementById("prompt");
 const toneSelect = document.getElementById("tone");
 const goalSelect = document.getElementById("goal");
 const output = document.getElementById("output");
+const hashtagsOutput = document.getElementById("hashtagsOutput");
+const ctaOutput = document.getElementById("ctaOutput");
 const generateBtn = document.getElementById("generateBtn");
 const copyBtn = document.getElementById("copyBtn");
 const insertBtn = document.getElementById("insertBtn");
@@ -245,6 +247,18 @@ if (generateBtn) {
       return;
     }
 
+    if (output) {
+      output.value = "";
+    }
+
+    if (hashtagsOutput) {
+      hashtagsOutput.value = "";
+    }
+
+    if (ctaOutput) {
+      ctaOutput.value = "";
+    }
+
     setLoading(true);
     showMessage("");
 
@@ -256,13 +270,40 @@ if (generateBtn) {
       (response) => {
         setLoading(false);
 
-        if (!response || !response.success) {
-          showMessage(response?.message || "Failed to generate post.");
+        if (chrome.runtime.lastError) {
+          showMessage("Failed to communicate with extension background script.");
+          return;
+        }
+
+        if (!response) {
+          showMessage("No response received from backend.");
+          return;
+        }
+
+        if (!response.success) {
+          if (response.errors) {
+            const firstError = Object.values(response.errors)[0];
+            showMessage(firstError || response.message || "Failed to generate post.");
+            return;
+          }
+
+          showMessage(response.message || "Failed to generate post.");
           return;
         }
 
         if (output) {
-          output.value = response.data.post || "";
+          output.value = response.data?.post || "";
+        }
+
+        if (hashtagsOutput) {
+          const hashtags = Array.isArray(response.data?.hashtags)
+            ? response.data.hashtags.join(" ")
+            : "";
+          hashtagsOutput.value = hashtags;
+        }
+
+        if (ctaOutput) {
+          ctaOutput.value = response.data?.cta || "";
         }
 
         showMessage("Post generated successfully.");
@@ -274,8 +315,21 @@ if (generateBtn) {
 if (copyBtn) {
   copyBtn.addEventListener("click", async () => {
     try {
-      await navigator.clipboard.writeText(output?.value || "");
-      showMessage("Copied to clipboard.");
+      const postText = output?.value || "";
+      const ctaText = ctaOutput?.value || "";
+      const hashtagsText = hashtagsOutput?.value || "";
+
+      const combinedText = [
+        postText,
+        "", // spacing
+        ctaText,
+        "", // spacing
+        hashtagsText,
+      ].join("\n");
+
+      await navigator.clipboard.writeText(combinedText);
+
+      showMessage("Copied post, CTA, and hashtags.");
     } catch (error) {
       showMessage("Failed to copy.");
     }
