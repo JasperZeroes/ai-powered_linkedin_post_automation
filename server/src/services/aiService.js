@@ -1,17 +1,21 @@
 const OpenAI = require("openai");
 const { buildLinkedInPrompt } = require("./promptService");
 
-const openaiClient = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
+const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-4.1-mini";
+const GROQ_MODEL = process.env.GROQ_MODEL || "llama-3.3-70b-versatile";
 
-const groqClient = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY,
-  baseURL: "https://api.groq.com/openai/v1",
-});
+const openaiClient = process.env.OPENAI_API_KEY
+  ? new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+    })
+  : null;
 
-const OPENAI_MODEL = "gpt-4.1-mini";
-const GROQ_MODEL = "llama-3.3-70b-versatile";
+const groqClient = process.env.GROQ_API_KEY
+  ? new OpenAI({
+      apiKey: process.env.GROQ_API_KEY,
+      baseURL: "https://api.groq.com/openai/v1",
+    })
+  : null;
 
 function parseAiJsonResponse(rawContent) {
   if (!rawContent || typeof rawContent !== "string") {
@@ -20,7 +24,6 @@ function parseAiJsonResponse(rawContent) {
 
   let cleaned = rawContent.trim();
 
-  // Handles ```json ... ``` and ``` ... ```
   if (cleaned.startsWith("```")) {
     cleaned = cleaned.replace(/^```json\s*/i, "").replace(/^```\s*/i, "");
     cleaned = cleaned.replace(/\s*```$/, "");
@@ -40,6 +43,14 @@ function parseAiJsonResponse(rawContent) {
     throw new Error("AI response is missing 'post'");
   }
 
+  if (!cta) {
+    throw new Error("AI response is missing 'cta'");
+  }
+
+  if (hashtags.length !== 3) {
+    throw new Error("AI response must include exactly 3 hashtags");
+  }
+
   return {
     post,
     hashtags,
@@ -48,6 +59,10 @@ function parseAiJsonResponse(rawContent) {
 }
 
 async function requestLinkedInPost({ client, model, provider, prompt, tone, goal }) {
+  if (!client) {
+    throw new Error(`${provider} client is not configured`);
+  }
+
   const finalPrompt = buildLinkedInPrompt({ prompt, tone, goal });
   const startedAt = Date.now();
 
@@ -104,27 +119,30 @@ async function generateWithOpenAI({ prompt, tone, goal }) {
 }
 
 async function generateLinkedInPost({ prompt, tone, goal }) {
+  let groqErrorMessage = null;
+
   try {
     return await generateWithGroq({ prompt, tone, goal });
   } catch (groqError) {
-    console.error("Groq failed, falling back to OpenAI:", groqError.message);
+    groqErrorMessage = groqError.message;
+    console.error("Groq failed, falling back to OpenAI:", groqErrorMessage);
+  }
 
-    try {
-      return await generateWithOpenAI({ prompt, tone, goal });
-    } catch (openaiError) {
-      console.error("OpenAI fallback also failed:", openaiError.message);
+  try {
+    return await generateWithOpenAI({ prompt, tone, goal });
+  } catch (openaiError) {
+    console.error("OpenAI fallback also failed:", openaiError.message);
 
-      return {
-        post: "",
-        hashtags: [],
-        cta: "",
-        provider: null,
-        modelName: null,
-        generationStatus: "failed",
-        errorMessage: `Groq failed: ${groqError.message}. OpenAI failed: ${openaiError.message}`,
-        generationTimeMs: null,
-      };
-    }
+    return {
+      post: "",
+      hashtags: [],
+      cta: "",
+      provider: null,
+      modelName: null,
+      generationStatus: "failed",
+      errorMessage: `Groq failed: ${groqErrorMessage || "unknown error"}. OpenAI failed: ${openaiError.message}`,
+      generationTimeMs: null,
+    };
   }
 }
 

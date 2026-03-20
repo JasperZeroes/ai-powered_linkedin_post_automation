@@ -118,9 +118,26 @@
       </select>
 
       <button id="generateBtn">Generate Post</button>
+      <div id="loading" class="loading hidden">
+        <span class="spinner"></span>
+        <span>Generating post...</span>
+      </div>
 
       <label for="output">Generated Post</label>
       <textarea id="output" placeholder="Your generated post will appear here"></textarea>
+      <label for="hashtagsOutput">Hashtags</label>
+      <textarea
+        id="hashtagsOutput"
+        placeholder="Generated hashtags will appear here"
+        readonly
+      ></textarea>
+
+      <label for="ctaOutput">CTA</label>
+      <textarea
+        id="ctaOutput"
+        placeholder="Generated CTA will appear here"
+        readonly
+      ></textarea>
 
       <div class="actions">
         <button id="saveDraftBtn">Save as Draft</button>
