@@ -91,6 +91,26 @@ function showView(view) {
   showMessage("");
 }
 
+function handleApiError(response, fallbackMessage) {
+  if (!response) {
+    showMessage(fallbackMessage);
+    return true;
+  }
+
+  if (!response.success) {
+    if (response.errors) {
+      const firstError = Object.values(response.errors)[0];
+      showMessage(firstError || response.message || fallbackMessage);
+      return true;
+    }
+
+    showMessage(response.message || fallbackMessage);
+    return true;
+  }
+
+  return false;
+}
+
 function wrapSelectedText(wrapperStart, wrapperEnd) {
   if (!output) return;
 
@@ -139,7 +159,13 @@ function applyBulletPoints() {
 // =========================
 // Initial screen
 // =========================
-showView(authChoiceView);
+chrome.runtime.sendMessage({ type: "GET_AUTH_STATE" }, (response) => {
+  if (response?.success && response.data?.isAuthenticated) {
+    showView(generatorView);
+  } else {
+    showView(authChoiceView);
+  }
+});
 
 // =========================
 // Auth navigation
@@ -181,7 +207,7 @@ if (goToSignupFromLogin) {
 }
 
 // =========================
-// Signup flow - UI only for now
+// Signup flow
 // After signup, move to login
 // =========================
 if (signupBtn) {
@@ -195,18 +221,42 @@ if (signupBtn) {
       return;
     }
 
-    // For now, this is UI-only.
-    // Later your teammate can replace this with real signup API logic.
-    showMessage("Signup successful. Please login.");
-    showView(loginView);
+    setLoading(true);
+    showMessage("");
 
-    if (loginEmail) {
-      loginEmail.value = email;
-    }
+    chrome.runtime.sendMessage(
+      {
+        type: "SIGNUP",
+        payload: {
+          full_name: fullName,
+          email,
+          password,
+        },
+      },
+      (response) => {
+        setLoading(false);
 
-    if (loginPassword) {
-      loginPassword.value = "";
-    }
+        if (chrome.runtime.lastError) {
+          showMessage("Failed to communicate with extension background script.");
+          return;
+        }
+
+        if (handleApiError(response, "Signup failed.")) {
+          return;
+        }
+
+        showMessage("Signup successful. Please login.");
+        showView(loginView);
+
+        if (loginEmail) {
+          loginEmail.value = email;
+        }
+
+        if (loginPassword) {
+          loginPassword.value = "";
+        }
+      }
+    );
   });
 }
 
@@ -224,10 +274,33 @@ if (loginBtn) {
       return;
     }
 
-    // For now, this is UI-only.
-    // Later your teammate can replace this with real login API logic.
-    showMessage("Login successful.");
-    showView(generatorView);
+    setLoading(true);
+    showMessage("");
+
+    chrome.runtime.sendMessage(
+      {
+        type: "LOGIN",
+        payload: {
+          email,
+          password,
+        },
+      },
+      (response) => {
+        setLoading(false);
+
+        if (chrome.runtime.lastError) {
+          showMessage("Failed to communicate with extension background script.");
+          return;
+        }
+
+        if (handleApiError(response, "Login failed.")) {
+          return;
+        }
+
+        showMessage("Login successful.");
+        showView(generatorView);
+      }
+    );
   });
 }
 
