@@ -1,3 +1,36 @@
+function sendAuthenticatedRequest({ url, method = "GET", token, body = null, sendResponse, fallbackMessage }) {
+  fetch(url, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: body ? JSON.stringify(body) : null,
+  })
+    .then(async (res) => {
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        sendResponse({
+          success: false,
+          message: data?.message || fallbackMessage,
+          errors: data?.errors || null,
+        });
+        return;
+      }
+
+      sendResponse(data);
+    })
+    .catch((error) => {
+      console.error(`${method} ${url} error:`, error);
+
+      sendResponse({
+        success: false,
+        message: "Could not connect to the backend server.",
+      });
+    });
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.type === "SIGNUP") {
     fetch("http://localhost:5000/api/auth/signup", {
@@ -198,6 +231,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           user: result.currentUser || null,
           isAuthenticated: !!result.authToken,
         },
+      });
+    });
+
+    return true;
+  }
+
+  if (message.type === "LOG_USAGE_EVENT") {
+    chrome.storage.local.get(["authToken"], (result) => {
+      const token = result.authToken;
+
+      if (!token) {
+        sendResponse({
+          success: false,
+          message: "Unauthorized. Please login first.",
+        });
+        return;
+      }
+
+      sendAuthenticatedRequest({
+        url: "http://localhost:5000/api/events",
+        method: "POST",
+        token,
+        body: message.payload,
+        sendResponse,
+        fallbackMessage: "Failed to log usage event.",
       });
     });
 

@@ -1,4 +1,4 @@
-function validateLogEvent(data) {
+function validateUsageEvent(data) {
   const errors = {};
 
   if (!data.event_type || typeof data.event_type !== "string" || !data.event_type.trim()) {
@@ -29,5 +29,5 @@ function validateLogEvent(data) {
 }
 
 module.exports = {
-  validateLogEvent,
+  validateUsageEvent,
 };

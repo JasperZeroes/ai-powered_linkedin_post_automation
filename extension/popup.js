@@ -108,6 +108,15 @@ function handleApiError(response, fallbackMessage) {
   }
 
   if (!response.success) {
+    logUsageEvent({
+        eventType: "post",
+        eventName: "post_generation_failed",
+        metadata: {
+          source: "chrome_extension",
+          reason: response.message || "Unknown generation failure",
+        },
+      });
+
     if (response.errors) {
       const firstError = Object.values(response.errors)[0];
       showMessage(firstError || response.message || fallbackMessage);
@@ -171,6 +180,17 @@ function restoreLocalDraft() {
     if (ctaOutput) {
       ctaOutput.value = savedDraft.cta || "";
     }
+  });
+}
+
+function logUsageEvent({ eventType, eventName, metadata = {} }) {
+  chrome.runtime.sendMessage({
+    type: "LOG_USAGE_EVENT",
+    payload: {
+      event_type: eventType,
+      event_name: eventName,
+      metadata,
+    },
   });
 }
 
@@ -469,6 +489,16 @@ if (generateBtn) {
 
         showMessage("Post generated successfully.");
         saveToLocalDraft();
+        logUsageEvent({
+          eventType: "post",
+          eventName: "post_generated",
+          metadata: {
+            source: "chrome_extension",
+            generated_post_id: response.data?.generated_post_id || null,
+            provider: response.data?.provider || null,
+            model_name: response.data?.model_name || null,
+          },
+        });
       }
     );
   });
@@ -533,6 +563,14 @@ if (saveDraftBtn) {
         }
 
         showMessage("Draft saved.");
+        logUsageEvent({
+          eventType: "draft",
+          eventName: "draft_saved",
+          metadata: {
+            source: "chrome_extension",
+            draft_id: response.data?.draft?.id || null,
+          },
+        });
       }
     );
   });
@@ -556,6 +594,13 @@ if (copyBtn) {
       await navigator.clipboard.writeText(combinedText);
 
       showMessage("Copied post, CTA, and hashtags.");
+      logUsageEvent({
+        eventType: "editor",
+        eventName: "post_copied",
+        metadata: {
+          source: "chrome_extension",
+        },
+      });
     } catch (error) {
       showMessage("Failed to copy.");
     }
@@ -589,6 +634,13 @@ if (insertBtn) {
         }
 
         showMessage(response?.message || "Insert action completed.");
+        logUsageEvent({
+          eventType: "editor",
+          eventName: "post_inserted",
+          metadata: {
+            source: "chrome_extension",
+          },
+        });
       }
     );
   });
