@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const postRoutes = require("./routes/postRoutes");
+const draftRoutes = require("./routes/draftRoutes");
 const errorHandler = require("./middlewares/errorHandler");
 const authRoutes = require("./routes/authRoutes");
 const authMiddleware = require("./middlewares/authMiddleware");
@@ -32,8 +33,8 @@ app.get("/health", (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/posts", authMiddleware, postRoutes);
+app.use("/api/drafts", authMiddleware, draftRoutes);
 
 app.use(errorHandler);
 
 module.exports = app;
-
