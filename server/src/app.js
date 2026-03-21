@@ -36,3 +36,4 @@ app.use("/api/posts", authMiddleware, postRoutes);
 app.use(errorHandler);
 
 module.exports = app;
+
