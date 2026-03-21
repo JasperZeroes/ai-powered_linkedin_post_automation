@@ -121,6 +121,59 @@ function handleApiError(response, fallbackMessage) {
   return false;
 }
 
+const LOCAL_DRAFT_STORAGE_KEY = "linkedinPostDraftLocal";
+
+function getLocalDraftPayload() {
+  return {
+    prompt: promptInput?.value || "",
+    tone: toneSelect?.value || "",
+    goal: goalSelect?.value || "",
+    post: output?.value || "",
+    hashtags: hashtagsOutput?.value || "",
+    cta: ctaOutput?.value || "",
+  };
+}
+
+function saveToLocalDraft() {
+  chrome.storage.local.set({
+    [LOCAL_DRAFT_STORAGE_KEY]: getLocalDraftPayload(),
+  });
+}
+
+function restoreLocalDraft() {
+  chrome.storage.local.get([LOCAL_DRAFT_STORAGE_KEY], (result) => {
+    const savedDraft = result?.[LOCAL_DRAFT_STORAGE_KEY];
+
+    if (!savedDraft) {
+      return;
+    }
+
+    if (promptInput) {
+      promptInput.value = savedDraft.prompt || "";
+    }
+
+    if (toneSelect && savedDraft.tone) {
+      toneSelect.value = savedDraft.tone;
+    }
+
+    if (goalSelect && savedDraft.goal) {
+      goalSelect.value = savedDraft.goal;
+    }
+
+    if (output) {
+      output.value = savedDraft.post || "";
+    }
+
+    if (hashtagsOutput) {
+      hashtagsOutput.value = savedDraft.hashtags || "";
+    }
+
+    if (ctaOutput) {
+      ctaOutput.value = savedDraft.cta || "";
+    }
+  });
+}
+
 function wrapSelectedText(wrapperStart, wrapperEnd) {
   if (!output) return;
 
@@ -172,6 +225,7 @@ function applyBulletPoints() {
 chrome.runtime.sendMessage({ type: "GET_AUTH_STATE" }, (response) => {
   if (response?.success && response.data?.isAuthenticated) {
     showView(generatorView);
+    restoreLocalDraft();
   } else {
     showView(authChoiceView);
   }
@@ -314,6 +368,30 @@ if (loginBtn) {
   });
 }
 
+if (promptInput) {
+  promptInput.addEventListener("input", saveToLocalDraft);
+}
+
+if (toneSelect) {
+  toneSelect.addEventListener("change", saveToLocalDraft);
+}
+
+if (goalSelect){
+  goalSelect.addEventListener("change", saveToLocalDraft);
+}
+
+if (output) {
+  output.addEventListener("input", saveToLocalDraft);
+}
+
+if (hashtagsOutput) {
+  hashtagsOutput.addEventListener("input", saveToLocalDraft);
+}
+
+if (ctaOutput) {
+  ctaOutput.addEventListener("input", saveToLocalDraft);
+}
+
 // =========================
 // Generator actions
 // =========================
@@ -390,6 +468,7 @@ if (generateBtn) {
         }
 
         showMessage("Post generated successfully.");
+        saveToLocalDraft();
       }
     );
   });
