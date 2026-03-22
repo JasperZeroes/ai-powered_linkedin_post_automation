@@ -624,7 +624,13 @@ if (insertBtn) {
       {
         type: "INSERT_POST",
         payload: {
-          text: output?.value || "",
+          text: [
+            output?.value || "",
+            "",
+            ctaOutput?.value || "",
+            "",
+            hashtagsOutput?.value || "",
+          ].join("\n"),
         },
       },
       (response) => {
@@ -633,7 +639,13 @@ if (insertBtn) {
           return;
         }
 
-        showMessage(response?.message || "Insert action completed.");
+        if (!response?.success) {
+          showMessage(response?.message || "Failed to insert into LinkedIn editor.");
+          return;
+        }
+
+        showMessage(response.message || "Insert action completed.");
+
         logUsageEvent({
           eventType: "editor",
           eventName: "post_inserted",
