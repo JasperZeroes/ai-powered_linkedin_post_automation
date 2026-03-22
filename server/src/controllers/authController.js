@@ -8,6 +8,7 @@ const {
   findUserById,
   updateLastLoginAt,
 } = require("../services/userRepository");
+const { createUsageEvent } = require("../services/eventService");
 
 function signToken(user) {
   return jwt.sign(
@@ -43,6 +44,22 @@ async function signup(req, res, next) {
     });
 
     const token = signToken(user);
+
+    try {
+      await createUsageEvent({
+        userId: user.id,
+        data: {
+          event_type: "auth",
+          event_name: "user_signup",
+          metadata: {
+            source: "backend",
+            email: user.email,
+          },
+        },
+      });
+    } catch (err) {
+      console.error("Failed to log signup event:", err.message);
+    }
 
     return res.status(201).json({
       success: true,
@@ -80,6 +97,22 @@ async function login(req, res, next) {
     await updateLastLoginAt(user.id);
 
     const token = signToken(user);
+
+    try {
+      await createUsageEvent({
+        userId: user.id,
+        data: {
+          event_type: "auth",
+          event_name: "user_login",
+          metadata: {
+            source: "backend",
+            email: user.email,
+          },
+        },
+      });
+    } catch (err) {
+      console.error("Failed to log sign in event:", err.message);
+    }
 
     return res.status(200).json({
       success: true,
