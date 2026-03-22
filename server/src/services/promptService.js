@@ -24,7 +24,10 @@ ${goal}
 Instructions:
 - Write in a natural professional LinkedIn tone
 - Start with a powerful hook
-- Keep paragraphs short (1–3 lines)
+- The post MUST be detailed and well-developed (minimum 150–250 words)
+- Use 4–7 short paragraphs (1–3 lines each)
+- Add insights, explanations, or mini storytelling to enrich the content
+- Avoid being generic — make it specific and valuable
 - No emojis
 - The post body must NOT include hashtags
 - Provide EXACTLY 3 relevant hashtags in the JSON
