@@ -607,8 +607,72 @@ if (copyBtn) {
   });
 }
 
+// if (insertBtn) {
+//   insertBtn.addEventListener("click", async () => {
+//     const [tab] = await chrome.tabs.query({
+//       active: true,
+//       currentWindow: true,
+//     });
+
+//     if (!tab?.id) {
+//       showMessage("No active tab found.");
+//       return;
+//     }
+
+//     chrome.tabs.sendMessage(
+//       tab.id,
+//       {
+//         type: "INSERT_POST",
+//         payload: {
+//           text: [
+//             output?.value || "",
+//             "",
+//             ctaOutput?.value || "",
+//             "",
+//             hashtagsOutput?.value || "",
+//           ].join("\n"),
+//         },
+//       },
+//       (response) => {
+//         if (chrome.runtime.lastError) {
+//           showMessage("Refresh page. Could not connect to LinkedIn page.");
+//           return;
+//         }
+
+//         if (!response?.success) {
+//           showMessage(response?.message || "Failed to insert into LinkedIn editor.");
+//           return;
+//         }
+
+//         showMessage(response.message || "Insert action completed.");
+
+//         logUsageEvent({
+//           eventType: "editor",
+//           eventName: "post_inserted",
+//           metadata: {
+//             source: "chrome_extension",
+//           },
+//         });
+//       }
+//     );
+//   });
+// }
+
 if (insertBtn) {
   insertBtn.addEventListener("click", async () => {
+    const combinedText = [
+      output?.value || "",
+      "",
+      ctaOutput?.value || "",
+      "",
+      hashtagsOutput?.value || "",
+    ].join("\n");
+
+    if (!combinedText.trim()) {
+      showMessage("No content available to insert.");
+      return;
+    }
+
     const [tab] = await chrome.tabs.query({
       active: true,
       currentWindow: true,
@@ -619,23 +683,35 @@ if (insertBtn) {
       return;
     }
 
-    chrome.tabs.sendMessage(
-      tab.id,
+    const currentUrl = tab.url || "";
+    const isLinkedIn = currentUrl.includes("linkedin.com");
+
+    let allowRedirect = false;
+
+    if (!isLinkedIn) {
+      const confirmed = window.confirm(
+        "You are not currently on LinkedIn. You will be redirected to LinkedIn home feed to insert this post. Continue?"
+      );
+
+      if (!confirmed) {
+        showMessage("Insert cancelled.");
+        return;
+      }
+
+      allowRedirect = true;
+    }
+
+    chrome.runtime.sendMessage(
       {
-        type: "INSERT_POST",
+        type: "INSERT_POST_SMART",
         payload: {
-          text: [
-            output?.value || "",
-            "",
-            ctaOutput?.value || "",
-            "",
-            hashtagsOutput?.value || "",
-          ].join("\n"),
+          text: combinedText,
+          allowRedirect,
         },
       },
       (response) => {
         if (chrome.runtime.lastError) {
-          showMessage("Could not connect to LinkedIn page.");
+          showMessage("Could not start LinkedIn insertion flow.");
           return;
         }
 
@@ -644,19 +720,32 @@ if (insertBtn) {
           return;
         }
 
+        // showMessage(response.message || "Insert action completed.");
+
+        // logUsageEvent({
+        //   eventType: "editor",
+        //   eventName: "post_inserted",
+        //   metadata: {
+        //     source: "chrome_extension",
+        //   },
+        // });
+
         showMessage(response.message || "Insert action completed.");
 
-        logUsageEvent({
-          eventType: "editor",
-          eventName: "post_inserted",
-          metadata: {
-            source: "chrome_extension",
-          },
-        });
+        if (response.inserted === true && response.target === "main_post_editor") {
+          logUsageEvent({
+            eventType: "editor",
+            eventName: "post_inserted",
+            metadata: {
+              source: "chrome_extension",
+            },
+          });
+        }
       }
     );
   });
 }
+
 
 if (boldBtn) {
   boldBtn.addEventListener("click", () => {
