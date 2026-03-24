@@ -86,6 +86,39 @@ function setLoading(isLoading, text = "Generating post...") {
   }
 }
 
+// =========================
+// Save to local Storage
+// =========================
+function saveToLocal() {
+  const backup = {
+    post: output?.value || "",
+    hashtags: hashtagsOutput?.value || "",
+    cta: ctaOutput?.value || "",
+    prompt: promptInput?.value || ""
+  };
+  localStorage.setItem("generatedPost", JSON.stringify(backup));
+}
+
+// ===========================
+// Load from local
+// ===========================
+
+function loadFromLocal() {
+  const saved = localStorage.getItem("generatedPost");
+  if (!saved) return;
+
+  try {
+    const data = JSON.parse(saved);
+    if (output) output.value = data.post || "";
+    if (hashtagsOutput) hashtagsOutput.value = data.hashtags || "";
+    if (ctaOutput) ctaOutput.value = data.cta || "";
+    if (promptInput) promptInput.value = data.prompt || "";
+  } catch (e) {
+    console.error("Failed to parse local storage", e);
+  }
+}
+
+
 function hideAllViews() {
   if (authChoiceView) authChoiceView.classList.add("hidden");
   if (signupView) signupView.classList.add("hidden");
@@ -172,6 +205,7 @@ function applyBulletPoints() {
 chrome.runtime.sendMessage({ type: "GET_AUTH_STATE" }, (response) => {
   if (response?.success && response.data?.isAuthenticated) {
     showView(generatorView);
+    loadFromLocal();
   } else {
     showView(authChoiceView);
   }
@@ -314,6 +348,7 @@ if (loginBtn) {
   });
 }
 
+
 // =========================
 // Generator actions
 // =========================
@@ -375,7 +410,7 @@ if (generateBtn) {
         }
 
         if (output) {
-          output.value = response.data?.post || "";
+          output.value = response.data?.post || ""
         }
 
         if (hashtagsOutput) {
@@ -388,7 +423,7 @@ if (generateBtn) {
         if (ctaOutput) {
           ctaOutput.value = response.data?.cta || "";
         }
-
+        saveToLocal(); // I am calling thing for it to run first before the message
         showMessage("Post generated successfully.");
       }
     );
@@ -532,3 +567,10 @@ if (bulletBtn) {
     applyBulletPoints();
   });
 }
+
+// Auto-save when user types or edits the generated text
+[output, hashtagsOutput, ctaOutput, promptInput].forEach(el => {
+  if (el) {
+    el.addEventListener("input", saveToLocal);
+  }
+});
