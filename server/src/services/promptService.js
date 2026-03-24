@@ -1,12 +1,16 @@
 /******************************************************
- *  OFFICIAL PRIMARY TEMPLATE (UPDATED WITH WORD COUNT)
+ *  OFFICIAL PRIMARY TEMPLATE (UPDATED)
+ *  This template generates:
+ *  - post (text)
+ *  - hashtags (array)
+ *  - cta (string)
  ******************************************************/
 
 function buildLinkedInPrompt({ prompt, tone, goal }) {
   return `
 You are an expert LinkedIn content writer.
 
-Write a polished, well‑structured LinkedIn post based on the details below.
+Write a polished LinkedIn post based on the details below.
 
 User idea:
 ${prompt}
@@ -17,38 +21,38 @@ ${tone}
 Goal:
 ${goal}
 
-Length requirements:
-- The post MUST be between 120 and 220 words.
-- Expand ideas naturally to reach the desired length.
-- Include context, examples, or mini‑insights if needed.
-
-Styling rules:
+Instructions:
+- Write in a natural professional LinkedIn tone
 - Start with a powerful hook
-- Use short paragraphs (1–3 lines each)
+- The post MUST be detailed and well-developed (minimum 150–250 words)
+- Use 4–7 short paragraphs (1–3 lines each)
+- Add insights, explanations, or mini storytelling to enrich the content
+- Avoid being generic — make it specific and valuable
 - No emojis
-- No hashtags inside the post body
-- Add EXACTLY 3 relevant hashtags separately in the JSON
-- Add a strong CTA (1 line)
-- Return VALID JSON ONLY
-- No markdown, no backticks, no text outside the JSON
+- The post body must NOT include hashtags
+- Provide EXACTLY 3 relevant hashtags in the JSON
+- Provide a strong CTA (Call to Action)
+- Return valid JSON ONLY
+- Do NOT add markdown code fences
+- Do NOT add extra text outside the JSON
 
 Return this exact JSON structure:
 {
-  "post": "Full post body (120–220 words, multi-paragraph)",
+  "post": "Main post body here",
   "hashtags": ["#tag1", "#tag2", "#tag3"],
-  "cta": "Thoughtful closing question or call to action"
+  "cta": "Thoughtful closing line or question"
 }
 `;
 }
 
-
 /******************************************************
- *  REWRITE TEMPLATE (WITH WORD COUNT)
+ *  1) REWRITE TEMPLATE (JSON OUTPUT)
  ******************************************************/
 
 function buildRewritePrompt({ text, tone }) {
   return `
-Rewrite the following into a polished LinkedIn post:
+You are an expert LinkedIn content editor.
+Rewrite the following text into a clean, polished LinkedIn-style post.
 
 Original text:
 ${text}
@@ -56,35 +60,31 @@ ${text}
 Tone:
 ${tone}
 
-Length rules:
-- Final rewritten post MUST be between 120 and 220 words.
-- Expand weak areas with context or examples.
-
-Styling rules:
+Rules:
+- Preserve meaning
+- Improve clarity and flow
 - No emojis
-- No hashtags inside post body
-- Provide EXACTLY 3 relevant hashtags
+- Post body MUST NOT include hashtags
+- Provide EXACTLY 3 new relevant hashtags
 - Provide a new CTA
-- Short readable paragraphs
-- Return JSON ONLY, NO text outside JSON
+- Return JSON ONLY
 
 JSON structure:
 {
-  "post": "Rewritten post (120–220 words)",
+  "post": "Rewritten post body",
   "hashtags": ["#tag1", "#tag2", "#tag3"],
   "cta": "New CTA"
 }
 `;
 }
 
-
 /******************************************************
- *  HOOK GENERATOR TEMPLATE (WITH LENGTH LOGIC)
+ *  2) HOOK GENERATOR TEMPLATE (JSON OUTPUT)
  ******************************************************/
 
 function buildHookPrompt({ prompt, tone }) {
   return `
-Generate a powerful LinkedIn hook AND a matching full post.
+You are an expert at writing high-impact LinkedIn hooks.
 
 Topic:
 ${prompt}
@@ -92,35 +92,30 @@ ${prompt}
 Tone:
 ${tone}
 
-Length:
-- Hook must be 1–2 lines max.
-- Full post must be 120–180 words.
-
-Styling rules:
-- Strong attention‑grabbing hook
+Rules:
+- Create a strong hook (1–2 lines max)
 - No emojis
-- No hashtags inside post body
-- EXACTLY 3 hashtags in JSON
+- No hashtags inside the hook
+- Also generate EXACTLY 3 relevant hashtags separately
 - Include a CTA
 - Return JSON ONLY
 
 JSON structure:
 {
-  "post": "Hook + full post (minimum 120 words)",
+  "post": "Hook only, 1–2 lines",
   "hashtags": ["#tag1", "#tag2", "#tag3"],
   "cta": "CTA line"
 }
 `;
 }
 
-
 /******************************************************
- *  SUMMARY TEMPLATE (WITH LENGTH)
+ *  3) SUMMARY → POST TEMPLATE (JSON OUTPUT)
  ******************************************************/
 
 function buildSummaryPrompt({ prompt, tone }) {
   return `
-Summarize the idea AND expand it into a full LinkedIn post.
+Summarize the following idea and transform it into a full polished LinkedIn post.
 
 Idea:
 ${prompt}
@@ -128,36 +123,33 @@ ${prompt}
 Tone:
 ${tone}
 
-Length:
-- Final post MUST be 130–200 words.
-
-Styling rules:
-- Clear, readable paragraphs
+Rules:
+- Make it scannable
+- Short readable paragraphs
 - No emojis
-- No hashtags inside main post
-- EXACTLY 3 hashtags in JSON
-- Include CTA
+- No hashtags in the post body
+- Provide EXACTLY 3 hashtags in JSON
+- Provide a CTA
 - Return JSON ONLY
 
 JSON structure:
 {
-  "post": "Summarized + expanded post (130–200 words)",
+  "post": "Summarized and expanded LinkedIn-style post",
   "hashtags": ["#tag1", "#tag2", "#tag3"],
   "cta": "CTA line"
 }
 `;
 }
 
-
 /******************************************************
- *  BULLETS → POST TEMPLATE (WITH LENGTH)
+ *  4) BULLETS → POST TEMPLATE (JSON OUTPUT)
  ******************************************************/
 
 function buildBulletToPostPrompt({ bullets, tone, goal }) {
   return `
-Convert the following bullet points into a long, structured LinkedIn post:
+Convert the following bullet points into a structured, flowing LinkedIn post.
 
-Bullets:
+Bullet points:
 ${bullets.map(b => "- " + b).join("\n")}
 
 Tone:
@@ -166,102 +158,92 @@ ${tone}
 Goal:
 ${goal}
 
-Length:
-- Final post must be between 140 and 220 words.
-
 Rules:
 - Transform bullets into narrative paragraphs
-- Start with a strong hook
+- Strong opening hook
 - No emojis
-- No hashtags in post body
-- EXACTLY 3 relevant hashtags
-- CTA required
-- JSON output only
+- No hashtags inside the post body
+- Provide EXACTLY 3 relevant hashtags
+- Provide CTA
+- Return JSON ONLY
 
 JSON structure:
 {
-  "post": "Expanded post (140–220 words)",
+  "post": "Full post generated from bullets",
   "hashtags": ["#tag1", "#tag2", "#tag3"],
-  "cta": "CTA"
+  "cta": "CTA line"
 }
 `;
 }
 
-
 /******************************************************
- *  EXPAND SHORT TEXT TEMPLATE (WITH LENGTH)
+ *  5) EXPAND SHORT TEXT TEMPLATE (JSON OUTPUT)
  ******************************************************/
 
 function buildExpandPrompt({ text, tone }) {
   return `
-Expand the following text into a complete, long LinkedIn post:
+Expand the following short text into a complete LinkedIn-style post.
 
-Text:
+Short text:
 ${text}
 
 Tone:
 ${tone}
 
-Length:
-- Final post must be 150–230 words.
-
-Styling rules:
-- Add insights, storytelling, examples
-- Short readable paragraphs
+Rules:
+- Add depth, storytelling, insights
+- 3–6 short paragraphs
 - No emojis
-- No hashtags in post body
-- EXACTLY 3 hashtags
-- Include CTA
+- No hashtags in main post body
+- Provide EXACTLY 3 hashtags in JSON
+- Provide a CTA
 - Return JSON ONLY
 
 JSON:
 {
-  "post": "Expanded long post (150–230 words)",
+  "post": "Expanded full LinkedIn-style post",
   "hashtags": ["#tag1", "#tag2", "#tag3"],
   "cta": "CTA line"
 }
 `;
 }
 
-
 /******************************************************
- *  TONE SHIFT TEMPLATE (WITH LENGTH)
+ *  6) TONE SHIFT TEMPLATE (JSON OUTPUT)
  ******************************************************/
 
 function buildToneShiftPrompt({ text, tone }) {
   return `
-Rewrite the following text with a NEW tone style:
+Rewrite the following text into a NEW tone style:
 
-Original:
+Text:
 ${text}
 
 New tone:
 ${tone}
 
-Length:
-- Final post must be 120–200 words.
-
-Styling rules:
-- Adjust tone but keep meaning
+Rules:
+- Do NOT change the meaning
+- Adjust tone ONLY
 - No emojis
-- No hashtags inside post
-- EXACTLY 3 hashtags
-- Add CTA
-- JSON ONLY
+- No hashtags inside post body
+- Provide 3 NEW hashtags
+- Provide a CTA
+- Return JSON ONLY
 
 JSON:
 {
-  "post": "Tone‑shifted post (120–200 words)",
+  "post": "Tone-shifted LinkedIn post",
   "hashtags": ["#tag1", "#tag2", "#tag3"],
   "cta": "CTA line"
 }
 `;
 }
 
-
 /******************************************************
- *  EXPORT ALL
+ * EXPORT ALL PROMPTS
  ******************************************************/
+
 module.exports = {
   buildLinkedInPrompt,
   buildRewritePrompt,
