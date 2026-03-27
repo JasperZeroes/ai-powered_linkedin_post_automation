@@ -97,7 +97,6 @@
         <option value="authentic">Authentic</option>
         <option value="persuasive">Persuasive</option>
         <option value="thoughtful">Thoughtful</option>
-
       </select>
 
       <label for="goal">Goal</label>
@@ -114,7 +113,6 @@
         <option value="promote service">Promote Service</option>
         <option value="announce launch">Product Launch</option>
         <option value="industry insight">Industry Insight</option>
-
       </select>
 
       <button id="generateBtn">Generate Post</button>
@@ -125,6 +123,109 @@
 
       <label for="output">Generated Post</label>
       <textarea id="output" placeholder="Your generated post will appear here"></textarea>
+
+      <!-- Generator View: Style buttons -->
+      <div class="format-actions">
+        <button type="button" id="boldBtn" aria-label="Bold">
+          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M7 4h6a5 5 0 0 1 0 10H7V4zm6 8a3 3 0 1 0 0-6H9v6h4zM7 14h7a5 5 0 0 1 0 10H7V14zm7 8a3 3 0 1 0 0-6h-5v6h5z"
+            />
+          </svg>
+        </button>
+
+        <button type="button" id="italicBtn" aria-label="Italics">
+          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M7 4h14v2h-6l-4 14h6v2H3v-2h6l4-14H7V4z"
+            />
+          </svg>
+        </button>
+
+        <button type="button" id="bulletBtn" aria-label="Bullets">
+          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="6" cy="6" r="2" fill="currentColor" />
+            <circle cx="6" cy="12" r="2" fill="currentColor" />
+            <circle cx="6" cy="18" r="2" fill="currentColor" />
+            <rect x="10" y="4.5" width="10" height="3" rx="1.5" fill="currentColor" />
+            <rect x="10" y="10.5" width="10" height="3" rx="1.5" fill="currentColor" />
+            <rect x="10" y="16.5" width="10" height="3" rx="1.5" fill="currentColor" />
+          </svg>
+        </button>
+
+        <div class="format-dropdown-wrap">
+          <button
+            type="button"
+            id="listMenuBtn"
+            class="list-menu-trigger"
+            aria-expanded="false"
+            aria-haspopup="true"
+            aria-label="List"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              aria-hidden="true"
+            >
+              <path d="M11 6h9"></path>
+              <path d="M11 12h9"></path>
+              <path d="M12 18h8"></path>
+              <path d="M4 16a2 2 0 1 1 4 0c0 .591 -.5 1 -1 1.5l-3 2.5h4"></path>
+              <path d="M6 10v-6l-2 2"></path>
+            </svg>
+            <svg width="10" height="10" viewBox="0 0 24 24" aria-hidden="true" class="caret">
+              <path fill="currentColor" d="M7 10l5 5 5-5H7z" />
+            </svg>
+          </button>
+          <div id="listMenu" class="dropdown-menu hidden" role="menu" aria-label="Numbered list style">
+            <button type="button" class="menu-item" role="menuitem" data-list-kind="numeric_dot">1. 2. 3.</button>
+            <button type="button" class="menu-item" role="menuitem" data-list-kind="numeric_rparen">1) 2) 3)</button>
+            <button type="button" class="menu-item" role="menuitem" data-list-kind="numeric_paren">(1) (2) (3)</button>
+            <button type="button" class="menu-item" role="menuitem" data-list-kind="alpha_lower_dot">a. b. c.</button>
+            <button type="button" class="menu-item" role="menuitem" data-list-kind="alpha_lower_rparen">a) b) c)</button>
+            <button type="button" class="menu-item" role="menuitem" data-list-kind="alpha_lower_paren">(a) (b) (c)</button>
+            <button type="button" class="menu-item" role="menuitem" data-list-kind="alpha_upper_rparen">A) B) C)</button>
+            <button type="button" class="menu-item" role="menuitem" data-list-kind="roman_lower_dot">i. ii. iii.</button>
+            <button type="button" class="menu-item" role="menuitem" data-list-kind="roman_upper_dot">I. II. III.</button>
+          </div>
+        </div>
+
+        <button type="button" id="codeBtn" aria-label="Code">
+          <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              fill="currentColor"
+              d="M9.4 16.6L4.8 12l4.6-4.6L8 6l-6 6 6 6 1.4-1.4zm5.2 0L20.2 12 14.6 7.4 16 6l6 6-6 6-1.4-1.4z"
+            />
+          </svg>
+        </button>
+
+        <button type="button" id="copyOutputBtn" aria-label="Copy text">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"></path>
+            <path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"></path>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Generator View: Hashtags and CTA -->
       <label for="hashtagsOutput">Hashtags</label>
       <textarea
         id="hashtagsOutput"
@@ -139,9 +240,25 @@
         readonly
       ></textarea>
 
+      <!-- Generator View: More buttons -->
       <div class="actions">
         <button id="saveDraftBtn">Save as Draft</button>
-        <button id="copyBtn">Copy</button>
+        <button id="copyBtn" aria-label="Copy">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"></path>
+            <path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"></path>
+          </svg>
+        </button>
         <button id="insertBtn">Insert into LinkedIn</button>
       </div>
     </div>
@@ -149,6 +266,7 @@
     <p id="message"></p>
   </div>
 
+  <script src="utils/formatter.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>
