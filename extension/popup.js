@@ -717,6 +717,7 @@ if (insertBtn) {
 
         if (!response?.success) {
           showMessage(response?.message || "Failed to insert into LinkedIn editor.");
+          console.log("LinkedIn insert debug response:", response);
           return;
         }
 
@@ -731,6 +732,7 @@ if (insertBtn) {
         // });
 
         showMessage(response.message || "Insert action completed.");
+        console.log("LinkedIn insert success response:", response);
 
         if (response.inserted === true && response.target === "main_post_editor") {
           logUsageEvent({

@@ -2,31 +2,200 @@ function isElementVisible(element) {
   if (!element) return false;
 
   const style = window.getComputedStyle(element);
+  const rect = element.getBoundingClientRect();
+
   return (
-    element.offsetParent !== null &&
     style.display !== "none" &&
-    style.visibility !== "hidden"
+    style.visibility !== "hidden" &&
+    style.opacity !== "0" &&
+    rect.width > 0 &&
+    rect.height > 0
   );
 }
 
-function findLinkedInEditor() {
-  const dialog = findMainPostDialog();
+function buildDebugResult({
+  success,
+  message,
+  inserted = false,
+  target = null,
+  debug = {},
+}) {
+  return {
+    success,
+    inserted,
+    target,
+    message,
+    debug,
+  };
+}
 
-  if (!dialog) {
-    return null;
+function getAllSearchRoots(root = document) {
+  const roots = [root];
+  const elements = root.querySelectorAll ? root.querySelectorAll("*") : [];
+
+  for (const element of elements) {
+    if (element.shadowRoot) {
+      roots.push(element.shadowRoot);
+      roots.push(...getAllSearchRoots(element.shadowRoot));
+    }
   }
 
+  return roots;
+}
+
+function queryAllAcrossRoots(selectors) {
+  const roots = getAllSearchRoots(document);
+  const matches = [];
+
+  for (const searchRoot of roots) {
+    for (const selector of selectors) {
+      if (searchRoot.querySelectorAll) {
+        matches.push(...Array.from(searchRoot.querySelectorAll(selector)));
+      }
+    }
+  }
+
+  return matches;
+}
+
+function collectDomDebugSnapshot() {
+  const roots = getAllSearchRoots(document);
+
+  const iframes = Array.from(document.querySelectorAll("iframe")).map((iframe) => ({
+    src: iframe.src,
+    id: iframe.id,
+    className: iframe.className,
+  }));
+
+  const contenteditableNodes = [];
+  const editorContainers = [];
+
+  for (const root of roots) {
+    if (root.querySelectorAll) {
+      contenteditableNodes.push(
+        ...Array.from(root.querySelectorAll('[contenteditable="true"]')).map((el) => ({
+          tagName: el.tagName,
+          className: el.className,
+          dataPlaceholder: el.getAttribute("data-placeholder"),
+          ariaPlaceholder: el.getAttribute("aria-placeholder"),
+          ariaLabel: el.getAttribute("aria-label"),
+          role: el.getAttribute("role"),
+          text: el.innerText?.slice(0, 100) || "",
+        }))
+      );
+
+      editorContainers.push(
+        ...Array.from(
+          root.querySelectorAll(".editor-container, .editor-content, .ql-container, .ql-editor")
+        ).map((el) => ({
+          tagName: el.tagName,
+          className: el.className,
+          text: el.innerText?.slice(0, 100) || "",
+        }))
+      );
+    }
+  }
+
+  return {
+    title: document.title,
+    url: location.href,
+    rootCount: roots.length,
+    iframeCount: iframes.length,
+    iframes,
+    contenteditableCount: contenteditableNodes.length,
+    contenteditableNodes,
+    editorContainerCount: editorContainers.length,
+    editorContainers,
+  };
+}
+
+function findLinkedInEditor() {
   const selectors = [
+    '.editor-content .ql-editor[contenteditable="true"]',
+    '.ql-container .ql-editor[contenteditable="true"]',
     '.ql-editor[contenteditable="true"][data-placeholder="What do you want to talk about?"]',
     '.ql-editor[contenteditable="true"][aria-placeholder="What do you want to talk about?"]',
-    '[data-test-ql-editor-contenteditable="true"][data-placeholder="What do you want to talk about?"]',
-    '[contenteditable="true"][role="textbox"][aria-label="Text editor for creating content"]',
+    '.ql-editor[contenteditable="true"][aria-label="Text editor for creating content"]',
+    '[data-test-ql-editor-contenteditable="true"]',
   ];
 
   for (const selector of selectors) {
-    const element = dialog.querySelector(selector);
+    const elements = Array.from(document.querySelectorAll(selector));
 
-    if (element && isElementVisible(element)) {
+    for (const element of elements) {
+      const style = window.getComputedStyle(element);
+      const isUsable =
+        style.display !== "none" &&
+        style.visibility !== "hidden" &&
+        element.getAttribute("contenteditable") === "true";
+
+      if (isUsable) {
+        return element;
+      }
+    }
+  }
+
+  return null;
+}
+
+function waitForLinkedInEditorAfterComposerOpen(timeoutMs = 20000, intervalMs = 500) {
+  return new Promise((resolve) => {
+    const start = Date.now();
+
+    const timer = setInterval(() => {
+      const editor = findLinkedInEditor();
+
+      if (editor) {
+        clearInterval(timer);
+        resolve(editor);
+        return;
+      }
+
+      if (Date.now() - start >= timeoutMs) {
+        clearInterval(timer);
+        resolve(null);
+      }
+    }, intervalMs);
+  });
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function findStartPostButton() {
+  const selectors = [
+    '[aria-label="Start a post"]',
+    '[aria-label*="Start a post"]',
+    'button[aria-label="Start a post"]',
+    'button[aria-label*="Start a post"]',
+    'div[aria-label="Start a post"]',
+    'div[aria-label*="Start a post"]',
+  ];
+
+  const directMatches = queryAllAcrossRoots(selectors);
+
+  for (const element of directMatches) {
+    if (isElementVisible(element)) {
+      return element;
+    }
+  }
+
+  const clickableElements = queryAllAcrossRoots([
+    "button",
+    'div[role="button"]',
+    "div[aria-label]",
+    "div",
+  ]);
+
+  for (const element of clickableElements) {
+    const text = element.innerText?.trim().toLowerCase() || "";
+    const ariaLabel = element.getAttribute("aria-label")?.trim().toLowerCase() || "";
+
+    if (
+      (text.includes("start a post") || ariaLabel.includes("start a post")) &&
+      isElementVisible(element)
+    ) {
       return element;
     }
   }
@@ -34,52 +203,102 @@ function findLinkedInEditor() {
   return null;
 }
 
-function findStartPostButton() {
-  const buttons = Array.from(document.querySelectorAll("button"));
+function findPostComposerEditor() {
+  const selectors = [
+    '.editor-container .editor-content .ql-editor[contenteditable="true"]',
+    '.editor-container .ql-editor[contenteditable="true"]',
+    '.editor-content.ql-container .ql-editor[contenteditable="true"]',
+    '.ql-editor[contenteditable="true"][data-placeholder="What do you want to talk about?"]',
+    '.ql-editor[contenteditable="true"][aria-placeholder="What do you want to talk about?"]',
+    '.ql-editor[contenteditable="true"][aria-label="Text editor for creating content"]',
+    '.ql-editor[contenteditable="true"][role="textbox"]',
+  ];
 
-  for (const button of buttons) {
-    const text = button.innerText?.trim().toLowerCase() || "";
+  const elements = queryAllAcrossRoots(selectors);
 
-    if (text.includes("start a post") && isElementVisible(button)) {
-      return button;
+  for (const element of elements) {
+    if (element.getAttribute("contenteditable") === "true") {
+      return element;
     }
   }
 
   return null;
 }
+
+function waitForPostComposerEditorWithObserver(timeoutMs = 20000) {
+  return new Promise((resolve) => {
+    const existingEditor = findPostComposerEditor();
+
+    if (existingEditor) {
+      resolve(existingEditor);
+      return;
+    }
+
+    const observer = new MutationObserver(() => {
+      const editor = findPostComposerEditor();
+
+      if (editor) {
+        observer.disconnect();
+        resolve(editor);
+      }
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+    });
+
+    setTimeout(() => {
+      observer.disconnect();
+      resolve(null);
+    }, timeoutMs);
+  });
+}
+
+function waitForPostComposerEditor(timeoutMs = 20000, intervalMs = 500) {
+  return new Promise((resolve) => {
+    const start = Date.now();
+
+    const timer = setInterval(() => {
+      const editor = findPostComposerEditor();
+
+      if (editor) {
+        clearInterval(timer);
+        resolve(editor);
+        return;
+      }
+
+      if (Date.now() - start >= timeoutMs) {
+        clearInterval(timer);
+        resolve(null);
+      }
+    }, intervalMs);
+  });
+}
+
 
 function findMainPostDialog() {
-  const dialogs = Array.from(document.querySelectorAll('[role="dialog"]'));
+  const editor = document.querySelector(
+    '.ql-editor[contenteditable="true"][data-placeholder="What do you want to talk about?"], ' +
+    '.ql-editor[contenteditable="true"][aria-placeholder="What do you want to talk about?"], ' +
+    '[data-test-ql-editor-contenteditable="true"][data-placeholder="What do you want to talk about?"], ' +
+    '[contenteditable="true"][role="textbox"][aria-label="Text editor for creating content"]'
+  );
 
-  for (const dialog of dialogs) {
-    if (!isElementVisible(dialog)) {
-      continue;
-    }
-
-    const text = dialog.innerText?.toLowerCase() || "";
-
-    const looksLikePostComposer =
-      text.includes("create a post") ||
-      text.includes("what do you want to talk about?");
-
-    if (looksLikePostComposer) {
-      return dialog;
-    }
+  if (!editor || !isElementVisible(editor)) {
+    return null;
   }
 
-  return null;
+  return editor.closest(".editor-content, .ql-container, .share-box-feed-entry__closed-share-box, body");
 }
 
-function isMainPostComposerOpen() {
-  return !!findLinkedInEditor();
-}
-
-function waitForEditor(timeoutMs = 12000, intervalMs = 300) {
+function waitForEditor(timeoutMs = 20000, intervalMs = 300) {
   return new Promise((resolve) => {
     const startTime = Date.now();
 
     const timer = setInterval(() => {
-      const editor = findLinkedInEditor();
+      const editor = findPostComposerEditor();
 
       if (editor) {
         clearInterval(timer);
@@ -131,100 +350,137 @@ function placeCursorAtEnd(element) {
 
 function insertHtmlIntoEditor(editor, text) {
   if (!editor) {
-    return {
+    return buildDebugResult({
       success: false,
       inserted: false,
       target: null,
-      message: "LinkedIn editor not found.",
-    };
+      message: "DEBUG: editor argument is null.",
+    });
   }
 
   if (!text || !text.trim()) {
-    return {
+    return buildDebugResult({
       success: false,
       inserted: false,
       target: null,
-      message: "No content available to insert.",
-    };
+      message: "DEBUG: text is empty before insertion.",
+    });
   }
+
+  const beforeHtml = editor.innerHTML;
+  const beforeText = editor.innerText;
 
   editor.focus();
 
-  const html = buildLinkedInEditorHtml(text);
-  editor.innerHTML = html;
-  editor.classList.remove("ql-blank");
+  const lines = text.split("\n");
 
+  while (editor.firstChild) {
+    editor.removeChild(editor.firstChild);
+  }
+
+  lines.forEach((line) => {
+    const paragraph = document.createElement("p");
+
+    if (line.trim()) {
+      paragraph.textContent = line;
+    } else {
+      paragraph.innerHTML = "<br>";
+    }
+
+    editor.appendChild(paragraph);
+  });
+
+  if (!editor.children.length) {
+    const paragraph = document.createElement("p");
+    paragraph.innerHTML = "<br>";
+    editor.appendChild(paragraph);
+  }
+
+  editor.classList.remove("ql-blank");
   placeCursorAtEnd(editor);
 
   editor.dispatchEvent(new InputEvent("input", { bubbles: true }));
   editor.dispatchEvent(new Event("change", { bubbles: true }));
   editor.dispatchEvent(new Event("blur", { bubbles: true }));
 
-  const insertedText = editor.innerText.replace(/\u00A0/g, " ").trim();
+  const afterHtml = editor.innerHTML;
+  const afterText = editor.innerText.replace(/\u00A0/g, " ").trim();
 
-  if (!insertedText) {
-    return {
+  if (!afterText) {
+    return buildDebugResult({
       success: false,
       inserted: false,
       target: null,
-      message: "Failed to insert content into LinkedIn editor.",
-    };
+      message: "DEBUG: editor found, but inserted text is still empty after DOM write.",
+      debug: {
+        beforeHtml,
+        beforeText,
+        afterHtml,
+        afterText,
+        childCount: editor.children.length,
+      },
+    });
   }
 
-  return {
+  return buildDebugResult({
     success: true,
     inserted: true,
     target: "main_post_editor",
-    message: "Post inserted into LinkedIn editor.",
-  };
+    message: "DEBUG: insertion succeeded.",
+    debug: {
+      beforeHtml,
+      beforeText,
+      afterHtml,
+      afterText,
+      childCount: editor.children.length,
+    },
+  });
 }
 
 async function ensureEditorAndInsert(text) {
   if (!text || !text.trim()) {
-    return {
+    return buildDebugResult({
       success: false,
       inserted: false,
       target: null,
-      message: "No content available to insert.",
-    };
+      message: "DEBUG: no content available to insert.",
+    });
   }
 
-  // First, check if the MAIN post composer is already open
-  const existingMainEditor = findLinkedInEditor();
+  let editor = findPostComposerEditor();
 
-  if (existingMainEditor) {
-    return insertHtmlIntoEditor(existingMainEditor, text);
+  if (editor) {
+    return insertHtmlIntoEditor(editor, text);
   }
 
-  // Otherwise, always go through Start a post
   const startPostButton = findStartPostButton();
 
   if (!startPostButton) {
-    return {
+    return buildDebugResult({
       success: false,
       inserted: false,
       target: null,
-      message: "Could not find 'Start a post'. Open LinkedIn home and try again.",
-    };
+      message: "DEBUG: could not find Start a post trigger.",
+    });
   }
 
   startPostButton.click();
 
-  // small delay so LinkedIn can begin rendering the post modal
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  await new Promise((resolve) => setTimeout(resolve, 1500));
 
-  const editorAfterClick = await waitForEditor(12000, 300);
+  editor = await waitForPostComposerEditorWithObserver(20000);
 
-  if (!editorAfterClick) {
-    return {
+  if (!editor) {
+    return buildDebugResult({
       success: false,
       inserted: false,
       target: null,
-      message: "LinkedIn composer did not open in time.",
-    };
+      message: "DEBUG: composer opened visually, but script never re-found the editor.",
+      debug: collectDomDebugSnapshot(),
+    });
   }
 
-  return insertHtmlIntoEditor(editorAfterClick, text);
+  return insertHtmlIntoEditor(editor, text);
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
