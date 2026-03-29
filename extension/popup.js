@@ -5,11 +5,9 @@ const promptInput = document.getElementById("prompt");
 const toneSelect = document.getElementById("tone");
 const goalSelect = document.getElementById("goal");
 const output = document.getElementById("output");
-const copyOutputBtn = document.getElementById("copyOutputBtn");
 const hashtagsOutput = document.getElementById("hashtagsOutput");
 const ctaOutput = document.getElementById("ctaOutput");
 const generateBtn = document.getElementById("generateBtn");
-const copyBtn = document.getElementById("copyBtn");
 const insertBtn = document.getElementById("insertBtn");
 const boldBtn = document.getElementById("boldBtn");
 const italicBtn = document.getElementById("italicBtn");
@@ -55,6 +53,37 @@ const signupPassword = document.getElementById("signupPassword");
 
 const loginEmail = document.getElementById("loginEmail");
 const loginPassword = document.getElementById("loginPassword");
+const toggleSignupPassword = document.getElementById("toggleSignupPassword");
+const toggleLoginPassword = document.getElementById("toggleLoginPassword");
+
+function setupPasswordToggle(toggleBtn, inputEl) {
+  if (!toggleBtn || !inputEl) return;
+
+  const eye = toggleBtn.querySelector(".icon-eye");
+  const eyeOff = toggleBtn.querySelector(".icon-eye-off");
+  if (!eye || !eyeOff) return;
+
+  toggleBtn.addEventListener("click", () => {
+    const showPlain = inputEl.type === "password";
+    inputEl.type = showPlain ? "text" : "password";
+    eye.classList.toggle("hidden", showPlain);
+    eyeOff.classList.toggle("hidden", !showPlain);
+    toggleBtn.setAttribute("aria-label", showPlain ? "Hide password" : "Show password");
+    toggleBtn.setAttribute("aria-pressed", showPlain ? "true" : "false");
+  });
+}
+
+setupPasswordToggle(toggleSignupPassword, signupPassword);
+setupPasswordToggle(toggleLoginPassword, loginPassword);
+
+let lastFocusedFormatField = output;
+
+[output, hashtagsOutput, ctaOutput].forEach((el) => {
+  if (!el) return;
+  el.addEventListener("focusin", () => {
+    lastFocusedFormatField = el;
+  });
+});
 
 // =========================
 // Helpers
@@ -125,6 +154,52 @@ function handleApiError(response, fallbackMessage) {
   return false;
 }
 
+function formatDraftAsTxt(payload) {
+  const tagsStr = Array.isArray(payload.hashtags)
+    ? payload.hashtags.join(" ")
+    : payload.hashtags || "";
+  return [
+    `Title: ${payload.title}`,
+    "",
+    `Original prompt: ${payload.original_prompt}`,
+    `Tone: ${payload.tone}`,
+    `Goal: ${payload.goal}`,
+    "",
+    "--- Post ---",
+    payload.draft_content,
+    "",
+    "--- Hashtags ---",
+    tagsStr,
+    "",
+    "--- CTA ---",
+    payload.cta || "",
+    "",
+  ].join("\n");
+}
+
+function downloadDraftTxt(payload) {
+  if (!chrome.downloads?.download) return;
+
+  const text = formatDraftAsTxt(payload);
+  const blob = new Blob([text], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+
+  chrome.downloads.download(
+    {
+      url,
+      filename: `linkedin-draft-${stamp}.txt`,
+      saveAs: false,
+    },
+    () => {
+      URL.revokeObjectURL(url);
+      if (chrome.runtime.lastError) {
+        console.warn("Draft txt download:", chrome.runtime.lastError.message);
+      }
+    }
+  );
+}
+
 // =========================
 // Text formatting
 // =========================
@@ -167,19 +242,32 @@ function deactivateFormatButton(btn) {
   }
 }
 
-function applyOutputEdit(result) {
-  if (!output || !result) {
+function getFormattingTarget() {
+  const fields = [output, hashtagsOutput, ctaOutput].filter(Boolean);
+  const active = document.activeElement;
+  if (fields.includes(active)) {
+    return active;
+  }
+  if (lastFocusedFormatField && fields.includes(lastFocusedFormatField)) {
+    return lastFocusedFormatField;
+  }
+  return output || fields[0];
+}
+
+function applyOutputEdit(targetEl, result) {
+  if (!targetEl || !result) {
     return false;
   }
 
-  output.value = result.value;
-  output.focus();
-  output.setSelectionRange(result.selectionStart, result.selectionEnd);
+  targetEl.value = result.value;
+  targetEl.focus();
+  targetEl.setSelectionRange(result.selectionStart, result.selectionEnd);
   return true;
 }
 
 function applyEmphasis(kind, emptyMessage) {
-  if (!output) {
+  const target = getFormattingTarget();
+  if (!target) {
     return;
   }
 
@@ -188,26 +276,27 @@ function applyEmphasis(kind, emptyMessage) {
     return;
   }
 
-  const start = output.selectionStart;
-  const end = output.selectionEnd;
+  const start = target.selectionStart;
+  const end = target.selectionEnd;
 
   const result =
     kind === "bold"
-      ? fmt.applyBold(output.value, start, end)
+      ? fmt.applyBold(target.value, start, end)
       : kind === "italic"
-        ? fmt.applyItalic(output.value, start, end)
-        : fmt.applyCodeFence(output.value, start, end);
+        ? fmt.applyItalic(target.value, start, end)
+        : fmt.applyCodeFence(target.value, start, end);
 
   if (!result) {
     showMessage(emptyMessage);
     return;
   }
 
-  applyOutputEdit(result);
+  applyOutputEdit(target, result);
 }
 
 function applyBulletPoints() {
-  if (!output) {
+  const target = getFormattingTarget();
+  if (!target) {
     return;
   }
 
@@ -216,16 +305,16 @@ function applyBulletPoints() {
     return;
   }
 
-  const start = output.selectionStart;
-  const end = output.selectionEnd;
-  const result = fmt.applyList(output.value, start, end, "bullet");
+  const start = target.selectionStart;
+  const end = target.selectionEnd;
+  const result = fmt.applyList(target.value, start, end, "bullet");
 
   if (!result) {
     showMessage("Select text first.");
     return;
   }
 
-  applyOutputEdit(result);
+  applyOutputEdit(target, result);
   return result;
 }
 
@@ -234,7 +323,8 @@ function applyCodeFence() {
 }
 
 function applyListFormat(kind) {
-  if (!output) {
+  const target = getFormattingTarget();
+  if (!target) {
     return;
   }
 
@@ -243,16 +333,16 @@ function applyListFormat(kind) {
     return;
   }
 
-  const start = output.selectionStart;
-  const end = output.selectionEnd;
-  const result = fmt.applyList(output.value, start, end, kind);
+  const start = target.selectionStart;
+  const end = target.selectionEnd;
+  const result = fmt.applyList(target.value, start, end, kind);
 
   if (!result) {
     showMessage("Select text first.");
     return;
   }
 
-  applyOutputEdit(result);
+  applyOutputEdit(target, result);
   return result;
 }
 
@@ -351,7 +441,7 @@ if (goToSignupFromLogin) {
 
 // =========================
 // Signup flow
-// After signup, move to login
+// After signup, token is stored in background; move to generator
 // =========================
 if (signupBtn) {
   signupBtn.addEventListener("click", () => {
@@ -388,16 +478,8 @@ if (signupBtn) {
           return;
         }
 
-        showMessage("Signup successful. Please login.");
-        showView(loginView);
-
-        if (loginEmail) {
-          loginEmail.value = email;
-        }
-
-        if (loginPassword) {
-          loginPassword.value = "";
-        }
+        showMessage("Account created. You can generate a post.");
+        showView(generatorView);
       }
     );
   });
@@ -558,21 +640,23 @@ if (saveDraftBtn) {
         ? `${originalPrompt.slice(0, 60)}...`
         : originalPrompt;
 
+    const draftPayload = {
+      title,
+      original_prompt: originalPrompt,
+      tone,
+      goal,
+      draft_content: draftContent,
+      hashtags,
+      cta,
+    };
+
     setLoading(true, "Saving draft...");
     showMessage("");
 
     chrome.runtime.sendMessage(
       {
         type: "SAVE_DRAFT",
-        payload: {
-          title,
-          original_prompt: originalPrompt,
-          tone,
-          goal,
-          draft_content: draftContent,
-          hashtags,
-          cta,
-        },
+        payload: draftPayload,
       },
       (response) => {
         setLoading(false, "Generating post...");
@@ -587,34 +671,50 @@ if (saveDraftBtn) {
         }
 
         showMessage("Draft saved.");
+        downloadDraftTxt(draftPayload);
       }
     );
   });
 }
 
-if (copyBtn) {
-  copyBtn.addEventListener("click", async () => {
+const COPY_COOLDOWN_MS = 1500;
+
+document.querySelectorAll(".textarea-copy-btn").forEach((btn) => {
+  btn.addEventListener("click", async () => {
+    if (btn.disabled) return;
+
+    const id = btn.getAttribute("data-copy-target");
+    const ta = id ? document.getElementById(id) : null;
+    if (!ta) return;
+
     try {
-      const postText = output?.value || "";
-      const ctaText = ctaOutput?.value || "";
-      const hashtagsText = hashtagsOutput?.value || "";
+      btn.disabled = true;
+      btn.classList.add("cooldown");
+      setActiveFormatButton(btn);
 
-      const combinedText = [
-        postText,
-        "", // spacing
-        ctaText,
-        "", // spacing
-        hashtagsText,
-      ].join("\n");
+      await navigator.clipboard.writeText(ta.value || "");
 
-      await navigator.clipboard.writeText(combinedText);
-
-      showMessage("Copied post, CTA, and hashtags.");
+      if (id === "output") {
+        showMessage("Copied post.");
+      } else if (id === "hashtagsOutput") {
+        showMessage("Copied hashtags.");
+      } else {
+        showMessage("Copied CTA.");
+      }
     } catch (error) {
       showMessage("Failed to copy.");
+    } finally {
+      setTimeout(() => {
+        btn.classList.remove("cooldown");
+        btn.disabled = false;
+        if (activeFormatButton === btn) {
+          btn.classList.remove("active");
+          activeFormatButton = null;
+        }
+      }, COPY_COOLDOWN_MS);
     }
   });
-}
+});
 
 if (insertBtn) {
   insertBtn.addEventListener("click", async () => {
@@ -653,14 +753,14 @@ if (insertBtn) {
 // =========================
 if (boldBtn) {
   boldBtn.addEventListener("click", () => {
-    applyEmphasis("bold", "Select text in the generated post first.");
+    applyEmphasis("bold", "Select text first.");
     setActiveFormatButton(boldBtn);
   });
 }
 
 if (italicBtn) {
   italicBtn.addEventListener("click", () => {
-    applyEmphasis("italic", "Select text in the generated post first.");
+    applyEmphasis("italic", "Select text first.");
     setActiveFormatButton(italicBtn);
   });
 }
@@ -680,33 +780,5 @@ if (codeBtn) {
   codeBtn.addEventListener("click", () => {
     applyCodeFence();
     setActiveFormatButton(codeBtn);
-  });
-}
-
-if (copyOutputBtn) {
-  copyOutputBtn.addEventListener("click", async () => {
-    if (copyOutputBtn.disabled) return;
-
-    try {
-      copyOutputBtn.disabled = true;
-      copyOutputBtn.classList.add("cooldown");
-      setActiveFormatButton(copyOutputBtn);
-
-      const postText = output?.value || "";
-      await navigator.clipboard.writeText(postText);
-      showMessage("Copied generated post text.");
-    } catch (error) {
-      showMessage("Failed to copy.");
-    } finally {
-      const COPY_COOLDOWN_MS = 1500;
-      setTimeout(() => {
-        copyOutputBtn.classList.remove("cooldown");
-        copyOutputBtn.disabled = false;
-        if (activeFormatButton === copyOutputBtn) {
-          copyOutputBtn.classList.remove("active");
-          activeFormatButton = null;
-        }
-      }, COPY_COOLDOWN_MS);
-    }
   });
 }

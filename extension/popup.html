@@ -13,7 +13,7 @@
       <div class="brand-block">
         <h2>Welcome</h2>
         <p class="subtitle">
-          Sign up or log in to continue to your LinkedIn AI Post Generator.
+          Sign up or log in to this browser extension. This account is not related to your LinkedIn account.
         </p>
       </div>
 
@@ -29,6 +29,10 @@
 
       <h2>Create Account</h2>
 
+      <p class="subtitle">
+        Successfully signing up will take you to the post generator.
+      </p>
+
       <label for="signupName">Full Name</label>
       <input type="text" id="signupName" placeholder="Enter your full name" />
 
@@ -36,11 +40,30 @@
       <input type="email" id="signupEmail" placeholder="Enter your email" />
 
       <label for="signupPassword">Password</label>
-      <input
-        type="password"
-        id="signupPassword"
-        placeholder="Create a password"
-      />
+      <div class="password-field">
+        <input
+          type="password"
+          id="signupPassword"
+          placeholder="Create a password"
+          autocomplete="new-password"
+        />
+        <button
+          type="button"
+          class="password-toggle"
+          id="toggleSignupPassword"
+          aria-label="Show password"
+          aria-pressed="false"
+        >
+          <svg class="icon-eye" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          <svg class="icon-eye-off hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
+            <line x1="1" y1="1" x2="23" y2="23" />
+          </svg>
+        </button>
+      </div>
 
       <button id="signupBtn">Sign Up</button>
 
@@ -58,15 +81,38 @@
 
       <h2>Login</h2>
 
+      <p class="subtitle">
+        Sign in with the email and password for this browser extension account (not your LinkedIn account).
+      </p>
+
       <label for="loginEmail">Email</label>
       <input type="email" id="loginEmail" placeholder="Enter your email" />
 
       <label for="loginPassword">Password</label>
-      <input
-        type="password"
-        id="loginPassword"
-        placeholder="Enter your password"
-      />
+      <div class="password-field">
+        <input
+          type="password"
+          id="loginPassword"
+          placeholder="Enter your password"
+          autocomplete="current-password"
+        />
+        <button
+          type="button"
+          class="password-toggle"
+          id="toggleLoginPassword"
+          aria-label="Show password"
+          aria-pressed="false"
+        >
+          <svg class="icon-eye" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          <svg class="icon-eye-off hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
+            <line x1="1" y1="1" x2="23" y2="23" />
+          </svg>
+        </button>
+      </div>
 
       <button id="loginBtn">Login</button>
 
@@ -121,10 +167,7 @@
         <span>Generating post...</span>
       </div>
 
-      <label for="output">Generated Post</label>
-      <textarea id="output" placeholder="Your generated post will appear here"></textarea>
-
-      <!-- Generator View: Style buttons -->
+      <p class="format-toolbar-hint">Format selected text in any field below (post, hashtags, or CTA).</p>
       <div class="format-actions">
         <button type="button" id="boldBtn" aria-label="Bold">
           <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden="true">
@@ -206,59 +249,49 @@
             />
           </svg>
         </button>
+      </div>
 
-        <button type="button" id="copyOutputBtn" aria-label="Copy text">
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
+      <label for="output">Generated Post</label>
+      <div class="textarea-wrap">
+        <textarea id="output" placeholder="Generated post will appear here"></textarea>
+        <button type="button" class="textarea-copy-btn" data-copy-target="output" aria-label="Copy generated post">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"></path>
             <path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"></path>
           </svg>
         </button>
       </div>
 
-      <!-- Generator View: Hashtags and CTA -->
       <label for="hashtagsOutput">Hashtags</label>
-      <textarea
-        id="hashtagsOutput"
-        placeholder="Generated hashtags will appear here"
-        readonly
-      ></textarea>
-
-      <label for="ctaOutput">CTA</label>
-      <textarea
-        id="ctaOutput"
-        placeholder="Generated CTA will appear here"
-        readonly
-      ></textarea>
-
-      <!-- Generator View: More buttons -->
-      <div class="actions">
-        <button id="saveDraftBtn">Save as Draft</button>
-        <button id="copyBtn" aria-label="Copy">
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
+      <div class="textarea-wrap">
+        <textarea
+          id="hashtagsOutput"
+          placeholder="Generated hashtags will appear here"
+        ></textarea>
+        <button type="button" class="textarea-copy-btn" data-copy-target="hashtagsOutput" aria-label="Copy hashtags">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"></path>
             <path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"></path>
           </svg>
         </button>
+      </div>
+
+      <label for="ctaOutput">CTA</label>
+      <div class="textarea-wrap">
+        <textarea
+          id="ctaOutput"
+          placeholder="Generated CTA will appear here"
+        ></textarea>
+        <button type="button" class="textarea-copy-btn" data-copy-target="ctaOutput" aria-label="Copy CTA">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M7 7m0 2.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667z"></path>
+            <path d="M4.012 16.737a2.005 2.005 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="actions">
+        <button id="saveDraftBtn">Save as Draft</button>
         <button id="insertBtn">Insert into LinkedIn</button>
       </div>
     </div>

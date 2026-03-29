@@ -19,7 +19,20 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           return;
         }
 
-        sendResponse(data);
+        const token = data?.data?.token || data?.token || null;
+        const user = data?.data?.user || data?.user || null;
+
+        if (!token) {
+          sendResponse({
+            success: false,
+            message: "Signup succeeded but no token was returned.",
+          });
+          return;
+        }
+
+        chrome.storage.local.set({ authToken: token, currentUser: user }, () => {
+          sendResponse(data);
+        });
       })
       .catch((error) => {
         console.error("Signup error:", error);
