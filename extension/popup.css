@@ -321,6 +321,18 @@ button:hover {
   padding-bottom: 10px;
 }
 
+.actions button.cooldown {
+  background: #cbd5e1 !important;
+  color: #ffffff !important;
+  cursor: not-allowed;
+}
+
+.actions button.active {
+  background: #ffffff !important;
+  color: #0a66c2 !important;
+  border: 1px solid #0a66c2;
+}
+
 .actions button svg {
   display: block;
 }

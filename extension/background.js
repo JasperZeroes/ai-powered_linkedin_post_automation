@@ -20,7 +20,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         }
 
         const token = data?.data?.token || data?.token || null;
-        const user = data?.data?.user || data?.user || null;
 
         if (!token) {
           sendResponse({
@@ -30,9 +29,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           return;
         }
 
-        chrome.storage.local.set({ authToken: token, currentUser: user }, () => {
-          sendResponse(data);
-        });
+        sendResponse(data);
       })
       .catch((error) => {
         console.error("Signup error:", error);

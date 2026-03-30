@@ -18,6 +18,7 @@ const codeBtn = document.getElementById("codeBtn");
 const loading = document.getElementById("loading");
 const messageBox = document.getElementById("message");
 const saveDraftBtn = document.getElementById("saveDraftBtn");
+const copyAllBtn = document.getElementById("copyAllBtn");
 const loadingText = document.getElementById("loadingText");
 
 // =========================
@@ -441,7 +442,7 @@ if (goToSignupFromLogin) {
 
 // =========================
 // Signup flow
-// After signup, token is stored in background; move to generator
+// After signup, move to login
 // =========================
 if (signupBtn) {
   signupBtn.addEventListener("click", () => {
@@ -478,8 +479,11 @@ if (signupBtn) {
           return;
         }
 
-        showMessage("Account created. You can generate a post.");
-        showView(generatorView);
+        if (loginEmail) {
+          loginEmail.value = email;
+        }
+        showMessage("Account created successfully. Please log in.");
+        showView(loginView);
       }
     );
   });
@@ -679,6 +683,7 @@ if (saveDraftBtn) {
 
 const COPY_COOLDOWN_MS = 1500;
 
+// copy buttons for each textarea
 document.querySelectorAll(".textarea-copy-btn").forEach((btn) => {
   btn.addEventListener("click", async () => {
     if (btn.disabled) return;
@@ -715,6 +720,44 @@ document.querySelectorAll(".textarea-copy-btn").forEach((btn) => {
     }
   });
 });
+
+// "Copy All Texts" button
+if (copyAllBtn) {
+  copyAllBtn.addEventListener("click", async () => {
+    if (copyAllBtn.disabled) return;
+
+    try {
+      copyAllBtn.disabled = true;
+      copyAllBtn.classList.add("cooldown");
+      setActiveFormatButton(copyAllBtn);
+
+      // join generated post, hashtags, and CTA sections without stripping formatting
+      const postText = (output?.value || "").trimEnd();
+      const hashtagsText = (hashtagsOutput?.value || "").trimEnd();
+      const ctaText = (ctaOutput?.value || "").trimEnd();
+      const combined = [postText, hashtagsText, ctaText].filter((s) => s.length > 0).join("\n\n");
+
+      if (!combined) {
+        showMessage("Nothing to copy yet.");
+        return;
+      }
+
+      await navigator.clipboard.writeText(combined);
+      showMessage("Copied post, hashtags, and CTA.");
+    } catch (error) {
+      showMessage("Failed to copy.");
+    } finally {
+      setTimeout(() => {
+        copyAllBtn.classList.remove("cooldown");
+        copyAllBtn.disabled = false;
+        if (activeFormatButton === copyAllBtn) {
+          copyAllBtn.classList.remove("active");
+          activeFormatButton = null;
+        }
+      }, COPY_COOLDOWN_MS);
+    }
+  });
+}
 
 if (insertBtn) {
   insertBtn.addEventListener("click", async () => {
