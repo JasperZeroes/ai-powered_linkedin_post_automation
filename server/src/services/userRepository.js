@@ -38,9 +38,56 @@ async function updateLastLoginAt(id) {
   await pool.query(`UPDATE users SET last_login_at = NOW() WHERE id = $1`, [id]);
 }
 
+
+
+// Initialize user preferences for a new user
+async function initUserPreferences(userId) {
+  const query = `
+    INSERT INTO user_preferences (user_id)
+    VALUES ($1)
+    ON CONFLICT (user_id) DO NOTHING
+    RETURNING *;
+  `;
+  const result = await pool.query(query, [userId]);
+  // If already exists, fetch existing
+  if (result.rows.length === 0) {
+    const existing = await pool.query('SELECT * FROM user_preferences WHERE user_id = $1', [userId]);
+    return existing.rows[0];
+  }
+  return result.rows[0];
+}
+
+// Create a new session for a user
+async function createSession({ userId, refreshTokenHash, ipAddress, userAgent, expiresAt }) {
+  const query = `
+    INSERT INTO sessions (user_id, refresh_token_hash, ip_address, user_agent, expires_at)
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING id, user_id, is_active, expires_at, created_at;
+  `;
+  const values = [userId, refreshTokenHash, ipAddress, userAgent, expiresAt];
+  const result = await pool.query(query, values);
+  return result.rows[0];
+}
+
+
+// Create a usage event for a user/session
+async function createUsageEvent({ userId, sessionId, eventType, eventName, metadata }) {
+  const query = `
+    INSERT INTO usage_events (user_id, session_id, event_type, event_name, metadata)
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING id, user_id, session_id, event_type, event_name, metadata, created_at;
+  `;
+  const values = [userId || null, sessionId || null, eventType, eventName, metadata || {}];
+  const result = await pool.query(query, values);
+  return result.rows[0];
+}
+
 module.exports = {
   createUser,
   findUserByEmail,
   findUserById,
   updateLastLoginAt,
+  initUserPreferences,
+  createSession,
+  createUsageEvent,
 };
