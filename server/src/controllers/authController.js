@@ -1,20 +1,31 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto"); // Added for generating secure refresh tokens
 const env = require("../config/env");
 const { validateSignup, validateLogin } = require("../validators/auth.validator");
+
+// Updated repository imports based on the new schema needs
 const {
   createUser,
   findUserByEmail,
   findUserById,
-  updateLastLoginAt,
+  createSession,
+  createUsageEvent,
+  initUserPreferences 
 } = require("../services/userRepository");
 
+// Helper to generate JWT access token
 function signToken(user) {
   return jwt.sign(
     { id: user.id, email: user.email, full_name: user.full_name },
     env.jwtSecret,
-    { expiresIn: "7d" }
+    { expiresIn: "15m" } // Access tokens should be short-lived since you now have sessions/refresh tokens
   );
+}
+
+// Helper to generate a random Refresh Token
+function generateRefreshToken() {
+  return crypto.randomBytes(40).toString("hex");
 }
 
 async function signup(req, res, next) {
@@ -36,20 +47,44 @@ async function signup(req, res, next) {
     const saltRounds = 12;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
+    // 1. Create the User
     const user = await createUser({
       fullName: full_name.trim(),
       email: normalizedEmail,
       passwordHash,
     });
 
-    const token = signToken(user);
+    // 2. Initialize User Preferences (New Schema)
+    await initUserPreferences(user.id);
+
+    // 3. Create Session (New Schema requirement for Refresh Tokens & IP tracking)
+    const refreshToken = generateRefreshToken();
+    const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const userAgent = req.headers["user-agent"] || "unknown";
+
+    const session = await createSession({
+      userId: user.id,
+      refreshTokenHash,
+      ipAddress,
+      userAgent,
+      expiresAt,
+    });
+
+    // 4. Log the Usage Event (New Schema)
+    await createUsageEvent({
+      userId: user.id,
+      sessionId: session.id,
+      eventType: "auth",
+      eventName: "signup",
+      metadata: { provider: "local" },
+    });
 
     return res.status(201).json({
       success: true,
-      data: {
-        token,
-        user: { id: user.id, full_name: user.full_name, email: user.email },
-      },
+      redirect: "/login",
+      message: "Signup successful, Please login..."
     });
   } catch (err) {
     next(err);
@@ -67,6 +102,7 @@ async function login(req, res, next) {
 
     const normalizedEmail = email.trim().toLowerCase();
 
+    // 1. Validate User
     const user = await findUserByEmail(normalizedEmail);
     if (!user) {
       return res.status(401).json({ success: false, message: "Invalid email or password" });
@@ -77,7 +113,31 @@ async function login(req, res, next) {
       return res.status(401).json({ success: false, message: "Invalid email or password" });
     }
 
-    await updateLastLoginAt(user.id);
+    // REMOVED: updateLastLoginAt(user.id) - this is now handled by usage_events
+
+    // 2. Create Session (New Schema)
+    const refreshToken = generateRefreshToken();
+    const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const userAgent = req.headers["user-agent"] || "unknown";
+
+    const session = await createSession({
+      userId: user.id,
+      refreshTokenHash,
+      ipAddress,
+      userAgent,
+      expiresAt,
+    });
+
+    // 3. Log the Usage Event (New Schema)
+    await createUsageEvent({
+      userId: user.id,
+      sessionId: session.id,
+      eventType: "auth",
+      eventName: "login",
+      metadata: { provider: "local" },
+    });
 
     const token = signToken(user);
 
@@ -85,6 +145,7 @@ async function login(req, res, next) {
       success: true,
       data: {
         token,
+        refreshToken,
         user: { id: user.id, full_name: user.full_name, email: user.email },
       },
     });
