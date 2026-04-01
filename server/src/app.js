@@ -38,4 +38,3 @@ app.use("/api/drafts", authMiddleware, draftRoutes);
 app.use(errorHandler);
 
 module.exports = app;
-

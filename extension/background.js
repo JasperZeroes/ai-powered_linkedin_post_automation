@@ -19,6 +19,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           return;
         }
 
+        const token = data?.data?.token || data?.token || null;
+
+        if (!token) {
+          sendResponse({
+            success: false,
+            message: "Signup succeeded but no token was returned.",
+          });
+          return;
+        }
+
         sendResponse(data);
       })
       .catch((error) => {
