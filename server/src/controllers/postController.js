@@ -1,5 +1,6 @@
 const { generateLinkedInPost } = require("../services/aiService");
 const { insertGeneratedPost } = require("../services/postRepository");
+const { createUsageEvent } = require("../services/userRepository");
 const validateGenerateRequest = require("../utils/validateGenerateRequest");
 
 async function generatePost(req, res, next) {
@@ -45,6 +46,20 @@ async function generatePost(req, res, next) {
         message: result.errorMessage || "Failed to generate post",
       });
     }
+
+    // Record usage event for post generation
+    await createUsageEvent({
+      userId,
+      sessionId: null, // Can be added if session tracking is implemented but i think its not really relevant since the users had the session recorded earlier
+      eventType: "post",
+      eventName: "generate_post",
+      metadata: {
+        generated_post_id: savedPost.id,
+        tone,
+        goal,
+        generation_time_ms: result.generationTimeMs,
+      },
+    });
 
     return res.status(200).json({
       success: true,
