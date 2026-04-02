@@ -732,7 +732,13 @@ document.querySelectorAll(".textarea-copy-btn").forEach((btn) => {
       btn.classList.add("cooldown");
       setActiveFormatButton(btn);
 
-      await navigator.clipboard.writeText(ta.value || "");
+      const text = (ta.value || "").trim();
+      if (!text) {
+        showMessage("Nothing to copy yet.");
+        return;
+      }
+
+      await navigator.clipboard.writeText(text);
 
       if (id === "output") {
         showMessage("Copied post.");
@@ -858,34 +864,6 @@ if (codeBtn) {
   codeBtn.addEventListener("click", () => {
     applyCodeFence();
     setActiveFormatButton(codeBtn);
-  });
-}
-
-if (copyOutputBtn) {
-  copyOutputBtn.addEventListener("click", async () => {
-    if (copyOutputBtn.disabled) return;
-
-    try {
-      copyOutputBtn.disabled = true;
-      copyOutputBtn.classList.add("cooldown");
-      setActiveFormatButton(copyOutputBtn);
-
-      const postText = output?.value || "";
-      await navigator.clipboard.writeText(postText);
-      showMessage("Copied generated post text.");
-    } catch (error) {
-      showMessage("Failed to copy.");
-    } finally {
-      const COPY_COOLDOWN_MS = 1500;
-      setTimeout(() => {
-        copyOutputBtn.classList.remove("cooldown");
-        copyOutputBtn.disabled = false;
-        if (activeFormatButton === copyOutputBtn) {
-          copyOutputBtn.classList.remove("active");
-          activeFormatButton = null;
-        }
-      }, COPY_COOLDOWN_MS);
-    }
   });
 }
 
