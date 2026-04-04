@@ -76,7 +76,7 @@ CREATE TABLE IF NOT EXISTS usage_events (
     metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     CONSTRAINT check_event_type CHECK (event_type IN ('auth', 'post', 'draft', 'edit')),
-    CONSTRAINT check_event_name CHECK (event_name IN ('signup', 'login', 'generate_post', 'save_draft'))
+    CONSTRAINT check_event_name CHECK (event_name IN ('signup', 'login', 'post_generated', 'draft_saved'))
 );
 
 
