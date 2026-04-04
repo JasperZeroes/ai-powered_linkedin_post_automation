@@ -76,10 +76,8 @@ async function signup(req, res, next) {
     try{
       await logSignupEvent({
         userId: user.id,
-        sessioinId: session.id,
-        metadata: {
-          provider: "local",
-        }
+        sessionId: session.id,
+        provider: "local",
       });
     } catch (err) {
       next(err);
