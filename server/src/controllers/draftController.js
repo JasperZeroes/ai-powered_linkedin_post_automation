@@ -1,5 +1,5 @@
 const { validateCreateDraft, validateUpdateDraft } = require("../validators/draft.validator");
-const { createUsageEvent } = require("../services/userRepository");
+const { logDraftSavedEvent } = require("../services/eventService");
 
 const {
   saveDraft,
@@ -33,18 +33,15 @@ async function createDraft(req, res, next) {
       data: req.body,
     });
 
-    // Record usage event for draft creation
-    await createUsageEvent({
-      userId: req.user.id,
-      sessionId: null, // Can be added if session tracking is implemented
-      eventType: "draft",
-      eventName: "save_draft",
-      metadata: {
-        draft_id: draft.id,
-        tone: draft.tone,
-        goal: draft.goal,
-      },
-    });
+    // Record usage event via centralized event service
+    try {
+      await logDraftSavedEvent({
+        userId: req.user.id,
+        draftId: draft.id,
+      });
+    } catch (err) {
+      next(err);
+    }
 
     return res.status(201).json({
       success: true,
