@@ -1,5 +1,6 @@
 node_modules
 .env
+google_auth.json
 logs
 npm-debug.log
 .DS_Store
