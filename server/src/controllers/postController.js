@@ -1,6 +1,6 @@
 const { generateLinkedInPost } = require("../services/aiService");
 const { insertGeneratedPost } = require("../services/postRepository");
-const { createUsageEvent } = require("../services/userRepository");
+const { logPostGeneratedEvent } = require("../services/eventService");
 const validateGenerateRequest = require("../utils/validateGenerateRequest");
 
 async function generatePost(req, res, next) {
@@ -47,19 +47,18 @@ async function generatePost(req, res, next) {
       });
     }
 
-    // Record usage event for post generation
-    await createUsageEvent({
-      userId,
-      sessionId: null, // Can be added if session tracking is implemented but i think its not really relevant since the users had the session recorded earlier
-      eventType: "post",
-      eventName: "generate_post",
-      metadata: {
-        generated_post_id: savedPost.id,
-        tone,
-        goal,
-        generation_time_ms: result.generationTimeMs,
-      },
-    });
+    // Record usage event via centralized event service
+    try {
+      await logPostGeneratedEvent({
+        userId,
+        modelName: result.modelName,
+        provider: result.provider,
+        generatedPostId: savedPost.id,
+        generationTimeMs: result.generationTimeMs,
+      });
+    } catch (err) {
+      next(err);
+    }
 
     return res.status(200).json({
       success: true,
