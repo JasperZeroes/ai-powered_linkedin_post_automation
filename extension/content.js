@@ -225,7 +225,7 @@ function findPostComposerEditor() {
   return null;
 }
 
-function waitForPostComposerEditorWithObserver(timeoutMs = 20000) {
+function waitForPostComposerEditorWithObserver(timeoutMs = 30000) {
   return new Promise((resolve) => {
     const existingEditor = findPostComposerEditor();
 
@@ -466,9 +466,9 @@ async function ensureEditorAndInsert(text) {
 
   startPostButton.click();
 
-  await new Promise((resolve) => setTimeout(resolve, 1500));
+  await new Promise((resolve) => setTimeout(resolve, 2500));
 
-  editor = await waitForPostComposerEditorWithObserver(20000);
+  editor = await waitForPostComposerEditorWithObserver(30000);
 
   if (!editor) {
     return buildDebugResult({

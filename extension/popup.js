@@ -776,15 +776,15 @@ if (copyAllBtn) {
       const postText = (output?.value || "").trimEnd();
       const hashtagsText = (hashtagsOutput?.value || "").trimEnd();
       const ctaText = (ctaOutput?.value || "").trimEnd();
-      const combined = [postText, hashtagsText, ctaText].filter((s) => s.length > 0).join("\n\n");
+      const combinedText = [postText, ctaText, hashtagsText].filter((s) => s.length > 0).join("\n\n");
 
-      if (!combined) {
+      if (!combinedText) {
         showMessage("Nothing to copy yet.");
         return;
       }
 
-      await navigator.clipboard.writeText(combined);
-      showMessage("Copied post, hashtags, and CTA.");
+      await navigator.clipboard.writeText(combinedText);
+      showMessage("Copied post, CTA, and hashtags.");
     } catch (error) {
       showMessage("Failed to copy.");
     } finally {
@@ -802,6 +802,19 @@ if (copyAllBtn) {
 
 if (insertBtn) {
   insertBtn.addEventListener("click", async () => {
+    const combinedText = [
+      output?.value || "",
+      "",
+      ctaOutput?.value || "",
+      "",
+      hashtagsOutput?.value || "",
+    ].join("\n");
+
+    if (!combinedText.trim()) {
+      showMessage("No content available to insert.");
+      return;
+    }
+
     const [tab] = await chrome.tabs.query({
       active: true,
       currentWindow: true,
@@ -812,22 +825,47 @@ if (insertBtn) {
       return;
     }
 
-    chrome.tabs.sendMessage(
-      tab.id,
+    const currentUrl = tab.url || "";
+    const isLinkedIn = currentUrl.includes("linkedin.com");
+
+    let allowRedirect = false;
+
+    if (!isLinkedIn) {
+      const confirmed = window.confirm(
+        "You are not currently on LinkedIn. You will be redirected to LinkedIn home feed to insert this post. Continue?"
+      );
+
+      if (!confirmed) {
+        showMessage("Insert cancelled.");
+        return;
+      }
+
+      allowRedirect = true;
+    }
+
+    chrome.runtime.sendMessage(
       {
-        type: "INSERT_POST",
+        type: "INSERT_POST_SMART",
         payload: {
-          text: output?.value || "",
+          text: combinedText,
+          allowRedirect,
         },
       },
       (response) => {
         if (chrome.runtime.lastError) {
-          showMessage("Could not connect to LinkedIn page.");
+          showMessage("Could not start LinkedIn insertion flow.");
           return;
         }
 
-        showMessage(response?.message || "Insert action completed.");
-      }
+        if (!response?.success) {
+          showMessage(response?.message || "Failed to insert into LinkedIn editor.");
+          console.log("LinkedIn insert debug response:", response);
+          return;
+        }
+
+        showMessage(response.message || "Insert action completed.");
+        console.log("LinkedIn insert success response:", response);
+        }
     );
   });
 }
