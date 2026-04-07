@@ -14,9 +14,9 @@ const {
   findUserByEmail,
   findUserById,
   createSession,
-  createUsageEvent,
-  initUserPreferences 
+  initUserPreferences,
 } = require("../services/userRepository");
+const { logSignupEvent, logLoginEvent } = require("../services/eventService");
 
 // Helper to generate JWT access token
 function signToken(user) {
@@ -79,14 +79,18 @@ async function signup(req, res, next) {
       expiresAt,
     });
 
-    // 4. Log the Usage Event (New Schema)
-    await createUsageEvent({
-      userId: user.id,
-      sessionId: session.id,
-      eventType: "auth",
-      eventName: "signup",
-      metadata: { provider: "local" },
-    });
+    // 4. Log usage event via centralized event service
+    try{
+      await logSignupEvent({
+        userId: user.id,
+        sessionId: session.id,
+        metadata: {
+          provider: "local",
+        }
+      });
+    } catch (err) {
+      next(err);
+    }    
 
     const token = signToken(user);
 
@@ -153,14 +157,16 @@ async function login(req, res, next) {
       expiresAt,
     });
 
-    // 3. Log the Usage Event (New Schema)
-    await createUsageEvent({
-      userId: user.id,
-      sessionId: session.id,
-      eventType: "auth",
-      eventName: "login",
-      metadata: { provider: "local" },
-    });
+    // 3. Log usage event via centralized event service
+    try {
+      await logLoginEvent({
+        userId: user.id,
+        sessionId: session.id,
+        provider: "local",
+      });
+    } catch (err) {
+      next(err);
+    }
 
     const token = signToken(user);
 
