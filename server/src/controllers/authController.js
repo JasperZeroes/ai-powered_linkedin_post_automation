@@ -1,10 +1,11 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const crypto = require("crypto"); // Added for generating secure refresh tokens
+const crypto = require("crypto");
 const env = require("../config/env");
 const {
   readGoogleAuthConfig,
-  verifyGoogleAccessTokenAudience,
+  exchangeGoogleAuthCode,
+  verifyGoogleIdToken,
 } = require("../config/googleAuthConfig");
 const { validateSignup, validateLogin } = require("../validators/auth.validator");
 
@@ -32,9 +33,9 @@ function generateRefreshToken() {
   return crypto.randomBytes(40).toString("hex");
 }
 
-// ======
+// ------
 // Signup
-// ======
+// ------
 async function signup(req, res, next) {
   try {
     const { full_name, email, password } = req.body;
@@ -106,9 +107,9 @@ async function signup(req, res, next) {
   }
 }
 
-// =====
+// ------
 // Login
-// =====
+// ------
 async function login(req, res, next) {
   try {
     const { email, password } = req.body;
@@ -181,29 +182,22 @@ async function login(req, res, next) {
   }
 }
 
-// Helper to fetch User Profile from Google API
-async function fetchGoogleUserProfile(accessToken) {
-  const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-    headers: { Authorization: `Bearer ${accessToken}` },
-  });
-  if (!res.ok) {
-    return null;
-  }
-  return res.json();
-}
-
-// ======================
+// ----------------------
 // Google: Signup / Login
-// ======================
-/* FLOW:
- * 1) extension/manifest.json stores the "client id" (from Google Cloud OAuth client).
- * 2) user signs in with Google; Chrome uses that "client id" (e.g. chrome.identity) to obtain tokens from Google.
- * 3) Google returns an "access_token" to the extension.
- * 4) the extension POSTs that "access_token" to the backend API.
- * 5) the backend requests Google's tokeninfo for that "access_token".
- * 6) Google responds with JSON that includes `aud`, the OAuth client id that issued the token.
- * 7) the backend checks that `aud` equals the "client id" from google_auth.json.
- * 8) if they match, the Google token is valid, so, the backend completes sign-in and returns payload to the client.
+// ----------------------
+/* FLOW (OAuth 2.0 auth code + PKCE + OpenID ID token):
+ * ===================================================
+ * 1) extension/manifest.json stores the "client id" (from Google Cloud OAuth).
+ * 2) extension starts Google sign-in via chrome.identity.launchWebAuthFlow
+ *    using PKCE (code_challenge) and scopes: openid email profile.
+ * 3) user signs in with Google.
+ * 4) Google redirects back to the extension with an authorization "code".
+ * 5) the extension POSTs "code", "code_verifier", and "redirect_uri" to the backend API.
+ * 6) the backend exchanges the "code" with Google’s token endpoint (using PKCE).
+ * 7) Google returns an "id_token".
+ * 8) the backend verifies the "id_token" (signature, aud, iss, exp) with google-auth-library.
+ * 9) if valid, the backend extracts user info (email, name, picture).
+ * 10) the backend completes sign-in and returns app-specific auth payload to the client.
  */
 async function googleSignupLogin(req, res, next) {
   try {
@@ -215,24 +209,46 @@ async function googleSignupLogin(req, res, next) {
       });
     }
 
-    const accessToken = req.body?.access_token;
-    if (!accessToken || typeof accessToken !== "string") {
-      return res.status(400).json({ success: false, message: "access_token is required" });
+    const { code, code_verifier: codeVerifier, redirect_uri: redirectUri } = req.body || {};
+    if (!code || typeof code !== "string") {
+      return res.status(400).json({ success: false, message: "code is required" });
+    }
+    if (!codeVerifier || typeof codeVerifier !== "string") {
+      return res.status(400).json({ success: false, message: "code_verifier is required" });
+    }
+    if (!redirectUri || typeof redirectUri !== "string") {
+      return res.status(400).json({ success: false, message: "redirect_uri is required" });
     }
 
-    const audience = await verifyGoogleAccessTokenAudience(accessToken, googleConfig.clientId);
-    if (!audience.ok) {
-      return res.status(401).json({ success: false, message: audience.message });
+    const exchanged = await exchangeGoogleAuthCode({
+      code,
+      codeVerifier,
+      redirectUri,
+      clientId: googleConfig.clientId,
+      clientSecret: googleConfig.clientSecret,
+    });
+    if (!exchanged.ok) {
+      return res.status(401).json({ success: false, message: exchanged.message });
     }
 
-    const profile = await fetchGoogleUserProfile(accessToken);
-    if (!profile?.email) {
-      return res.status(401).json({ success: false, message: "Invalid or expired Google token" });
+    const verified = await verifyGoogleIdToken(exchanged.idToken, googleConfig.clientId);
+    if (!verified.ok) {
+      return res.status(401).json({ success: false, message: verified.message });
     }
 
-    const normalizedEmail = String(profile.email).trim().toLowerCase();
-    const fullName = (profile.name && String(profile.name).trim()) || normalizedEmail.split("@")[0];
-    const picture = profile.picture ? String(profile.picture) : null;
+    const payload = verified.payload;
+    if (!payload?.email) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Google ID token had no email claim" });
+    }
+    if (payload.email_verified === false) {
+      return res.status(401).json({ success: false, message: "Google email is not verified" });
+    }
+
+    const normalizedEmail = String(payload.email).trim().toLowerCase();
+    const fullName = (payload.name && String(payload.name).trim()) || normalizedEmail.split("@")[0];
+    const picture = payload.picture ? String(payload.picture) : null;
 
     let user = await findUserByEmail(normalizedEmail);
     let isNewUser = false;

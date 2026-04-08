@@ -1,5 +1,6 @@
 const fs = require("fs");
 const path = require("path");
+const { OAuth2Client } = require("google-auth-library");
 
 const GOOGLE_AUTH_PATH = path.join(__dirname, "..", "..", "google_auth.json");
 
@@ -36,31 +37,64 @@ function readGoogleAuthConfig() {
     return null;
   }
 
+  const secret =
+    typeof block.client_secret === "string" && block.client_secret.trim()
+      ? block.client_secret.trim()
+      : null;
+
   cachedConfig = {
     clientId: block.client_id.trim(),
+    clientSecret: secret,
     tokenUri: typeof block.token_uri === "string" ? block.token_uri : null,
     authUri: typeof block.auth_uri === "string" ? block.auth_uri : null,
   };
   return cachedConfig;
 }
 
-// verifies that the access token was issued for OAuth client
-async function verifyGoogleAccessTokenAudience(accessToken, expectedClientId) {
-  const url = `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    return { ok: false, message: "Invalid or expired Google token" };
+// PKCE code exchange at Google's token endpoint; returns id_token from Google's JSON response
+async function exchangeGoogleAuthCode({ code, codeVerifier, redirectUri, clientId, clientSecret }) {
+  const oauth2Client = new OAuth2Client({
+    clientId,
+    clientSecret: clientSecret || undefined,
+    redirectUri,
+  });
+  try {
+    const { tokens } = await oauth2Client.getToken({
+      code,
+      codeVerifier,
+    });
+    if (!tokens.id_token) {
+      return { ok: false, message: "Google did not return an id_token" };
+    }
+    return { ok: true, idToken: tokens.id_token };
+  } catch (err) {
+    const data = err.response?.data;
+    const msg =
+      (typeof data?.error_description === "string" && data.error_description) ||
+      (typeof data?.error === "string" && data.error) ||
+      err.message ||
+      "Google code exchange failed";
+    return { ok: false, message: String(msg) };
   }
-  const info = await res.json();
-  const aud = info.aud != null ? String(info.aud) : "";
-  if (aud !== expectedClientId) {
-    return { ok: false, message: "Google token is not valid for this application" };
+}
+
+// verifies ID token signature, aud, iss, exp via Google's JWKS
+async function verifyGoogleIdToken(idToken, expectedClientId) {
+  const client = new OAuth2Client(expectedClientId);
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: expectedClientId,
+    });
+    return { ok: true, payload: ticket.getPayload() };
+  } catch (err) {
+    return { ok: false, message: err.message || "Invalid Google ID token" };
   }
-  return { ok: true, info };
 }
 
 module.exports = {
   readGoogleAuthConfig,
-  verifyGoogleAccessTokenAudience,
+  exchangeGoogleAuthCode,
+  verifyGoogleIdToken,
   GOOGLE_AUTH_PATH,
 };
