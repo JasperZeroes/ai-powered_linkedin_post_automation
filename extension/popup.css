@@ -89,10 +89,46 @@ button:hover {
   opacity: 0.95;
 }
 
+button.auth-cta-btn {
+  border: 1px solid #0a66c2;
+  box-shadow:
+    0 0 3px rgba(0, 0, 0, 0.06),
+    0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+button.auth-cta-btn:hover {
+  box-shadow:
+    0 0 4px rgba(0, 0, 0, 0.08),
+    0 2px 3px rgba(0, 0, 0, 0.12);
+}
+
+button.auth-cta-btn:focus-visible {
+  outline: 2px solid #0a66c2;
+  outline-offset: 2px;
+}
+
 .secondary-btn {
   background: #ffffff;
   color: #0a66c2;
-  border: 1px solid #0a66c2;
+}
+
+.google-auth-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.google-auth-btn__logo {
+  display: block;
+  width: 1.15em;
+  height: 1.15em;
+  flex-shrink: 0;
+}
+
+.google-auth-btn__label {
+  font-weight: 600;
+  line-height: 1.25;
 }
 
 .google-auth-btn:disabled {
@@ -232,6 +268,12 @@ button:hover {
   display: block;
 }
 
+.format-actions > button > svg,
+.list-menu-trigger > svg:first-of-type {
+  width: 12px;
+  height: 12px;
+}
+
 .format-actions button.cooldown {
   background: #cbd5e1 !important;
   color: #ffffff !important;
@@ -242,15 +284,15 @@ button:hover {
 .format-actions {
   display: flex;
   flex-wrap: nowrap;
-  gap: 6px;
+  gap: 4px;
   margin-top: 8px;
 }
 
 .format-actions > button {
   /* override global button width:100% */
-  width: 48px;
-  height: 48px;
-  flex: 0 0 48px;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
   min-width: 0;
   margin-top: 0;
   padding: 0;
@@ -258,15 +300,15 @@ button:hover {
 
 .format-dropdown-wrap {
   position: relative;
-  width: 48px;
-  height: 48px;
-  flex: 0 0 48px;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
   min-width: 0;
 }
 
 .list-menu-trigger {
-  width: 48px;
-  height: 48px;
+  width: 36px;
+  height: 36px;
   margin-top: 0;
   display: flex;
   align-items: center;
@@ -276,8 +318,8 @@ button:hover {
 }
 
 .list-menu-trigger .caret {
-  width: 10px;
-  height: 10px;
+  width: 8px;
+  height: 8px;
   opacity: 0.85;
 }
 
