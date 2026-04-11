@@ -8,9 +8,9 @@ async function createUser({
   profileImageUrl = null,
 }) {
   const query = `
-    INSERT INTO users (full_name, email, password_hash, auth_provider, account_status, email_verified)
-    VALUES ($1, $2, $3, 'local', 'pending_verification', FALSE)
-    RETURNING id, full_name, email, account_status, email_verified, created_at
+    INSERT INTO users (full_name, email, password_hash, auth_provider, profile_image_url)
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING id, full_name, email, auth_provider, created_at
   `;
   const values = [fullName, email, passwordHash, authProvider, profileImageUrl];
   const result = await pool.query(query, values);
@@ -55,9 +55,7 @@ async function initUserPreferences(userId) {
   const result = await pool.query(query, [userId]);
   // If already exists, fetch existing
   if (result.rows.length === 0) {
-    const existing = await pool.query("SELECT * FROM user_preferences WHERE user_id = $1", [
-      userId,
-    ]);
+    const existing = await pool.query("SELECT * FROM user_preferences WHERE user_id = $1", [userId]);
     return existing.rows[0];
   }
   return result.rows[0];

@@ -48,45 +48,7 @@ function validateLogin(data) {
   };
 }
 
-function validateVerifyOtp(data) {
-  const errors = {};
-
-  if (!data.email || typeof data.email !== "string" || !data.email.trim()) {
-    errors.email = "Email is required";
-  } else if (!isValidEmail(data.email.trim())) {
-    errors.email = "Email is invalid";
-  }
-
-  if (!data.otp || typeof data.otp !== "string" || !data.otp.trim()) {
-    errors.otp = "OTP is required";
-  } else if (!/^\d{6}$/.test(data.otp.trim())) {
-    errors.otp = "OTP must be a 6-digit code";
-  }
-
-  return {
-    isValid: Object.keys(errors).length === 0,
-    errors,
-  };
-}
-
-function validateResendOtp(data) {
-  const errors = {};
-
-  if (!data.email || typeof data.email !== "string" || !data.email.trim()) {
-    errors.email = "Email is required";
-  } else if (!isValidEmail(data.email.trim())) {
-    errors.email = "Email is invalid";
-  }
-
-  return {
-    isValid: Object.keys(errors).length === 0,
-    errors,
-  };
-}
-
 module.exports = {
   validateSignup,
   validateLogin,
-  validateVerifyOtp,
-  validateResendOtp,
 };

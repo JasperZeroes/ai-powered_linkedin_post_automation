@@ -19,7 +19,6 @@
     "google-auth-library": "^9.15.1",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.2",
-    "nodemailer": "^8.0.5",
     "openai": "^4.56.0",
     "pg": "^8.11.3"
   },
