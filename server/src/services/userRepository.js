@@ -76,35 +76,23 @@ async function createSession({ userId, refreshTokenHash, ipAddress, userAgent, e
 }
 
 async function createEmailVerificationOtp({ userId, otpHash, expiresAt }) {
-  const client = await pool.connect();
+  const result = await pool.query(
+    `
+      INSERT INTO email_verification_otps (user_id, otp_hash, expires_at)
+      VALUES ($1, $2, $3)
+      ON CONFLICT (user_id) WHERE consumed_at IS NULL
+      DO UPDATE
+      SET otp_hash = EXCLUDED.otp_hash,
+          expires_at = EXCLUDED.expires_at,
+          attempts = 0,
+          consumed_at = NULL,
+          created_at = NOW()
+      RETURNING id, user_id, attempts, expires_at, created_at
+    `,
+    [userId, otpHash, expiresAt]
+  );
 
-  try {
-    await client.query("BEGIN");
-
-    const result = await client.query(
-      `
-        INSERT INTO email_verification_otps (user_id, otp_hash, expires_at)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (user_id) WHERE consumed_at IS NULL
-        DO UPDATE
-        SET otp_hash = EXCLUDED.otp_hash,
-            expires_at = EXCLUDED.expires_at,
-            attempts = 0,
-            consumed_at = NULL,
-            created_at = NOW()
-        RETURNING id, user_id, attempts, expires_at, created_at
-      `,
-      [userId, otpHash, expiresAt]
-    );
-
-    await client.query("COMMIT");
-    return result.rows[0];
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
+  return result.rows[0];
 }
 
 async function findLatestActiveEmailOtpByUserId(userId) {

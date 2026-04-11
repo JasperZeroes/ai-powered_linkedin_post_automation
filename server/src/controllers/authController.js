@@ -331,10 +331,7 @@ async function resendVerificationOtp(req, res, next) {
     if (latestOtp) {
       const nextAllowedAt = new Date(latestOtp.created_at).getTime() + resendCooldownMs;
       if (Date.now() < nextAllowedAt) {
-        return res.status(429).json({
-          success: false,
-          message: `Please wait ${env.otpResendCooldownSeconds} seconds before requesting another OTP.`,
-        });
+        return res.status(200).json(getGenericOtpResendResponse());
       }
     }
 

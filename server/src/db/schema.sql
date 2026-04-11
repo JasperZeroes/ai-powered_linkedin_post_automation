@@ -130,6 +130,23 @@ CREATE INDEX IF NOT EXISTS idx_usage_events_session_id ON usage_events(session_i
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_email_verification_otps_user_id ON email_verification_otps(user_id);
 CREATE INDEX IF NOT EXISTS idx_email_verification_otps_expires_at ON email_verification_otps(expires_at);
+
+WITH ranked_active_otps AS (
+  SELECT
+    id,
+    ROW_NUMBER() OVER (
+      PARTITION BY user_id
+      ORDER BY created_at DESC, id DESC
+    ) AS active_rank
+  FROM email_verification_otps
+  WHERE consumed_at IS NULL
+)
+UPDATE email_verification_otps otp
+SET consumed_at = NOW()
+FROM ranked_active_otps ranked
+WHERE otp.id = ranked.id
+  AND ranked.active_rank > 1;
+
 CREATE UNIQUE INDEX IF NOT EXISTS ux_email_verification_otps_one_active_per_user
   ON email_verification_otps(user_id)
   WHERE consumed_at IS NULL;
