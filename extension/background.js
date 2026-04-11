@@ -264,6 +264,77 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  // send forgot-password reset code
+  if (message.type === "SEND_RESET_CODE") {
+    fetch("http://localhost:5000/api/auth/forgot-password", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(message.payload),
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          sendResponse({
+            success: false,
+            message: data?.message || "Failed to send reset code.",
+            errors: data?.errors || null,
+          });
+          return;
+        }
+
+        sendResponse(data);
+      })
+      .catch((error) => {
+        console.error("Send reset code error:", error);
+
+        sendResponse({
+          success: false,
+          message: "Could not connect to the backend server.",
+        });
+      });
+
+    return true;
+  }
+
+  // reset password with emailed code
+  if (message.type === "RESET_PASSWORD") {
+    fetch("http://localhost:5000/api/auth/reset-password", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(message.payload),
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          sendResponse({
+            success: false,
+            message: data?.message || "Failed to reset password.",
+            errors: data?.errors || null,
+          });
+          return;
+        }
+
+        sendResponse(data);
+      })
+      .catch((error) => {
+        console.error("Reset password error:", error);
+
+        sendResponse({
+          success: false,
+          message: "Could not connect to the backend server.",
+        });
+      });
+
+    return true;
+  }
+
+
   // signup/login with Google
   if (message.type === "GOOGLE_AUTH") {
     (async () => {

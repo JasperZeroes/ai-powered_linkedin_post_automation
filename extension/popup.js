@@ -30,6 +30,8 @@ const authChoiceView = document.getElementById("authChoiceView");
 const signupView = document.getElementById("signupView");
 const loginView = document.getElementById("loginView");
 const generatorView = document.getElementById("generatorView");
+const forgotPasswordView = document.getElementById("forgotPasswordView");
+const resetPasswordView = document.getElementById("resetPasswordView");
 
 // =========================
 // Auth navigation buttons
@@ -40,12 +42,18 @@ const backFromSignup = document.getElementById("backFromSignup");
 const backFromLogin = document.getElementById("backFromLogin");
 const goToLoginFromSignup = document.getElementById("goToLoginFromSignup");
 const goToSignupFromLogin = document.getElementById("goToSignupFromLogin");
+const goToForgotPassword = document.getElementById("goToForgotPassword");
+const backFromForgotPassword = document.getElementById("backFromForgotPassword");
+const goToResetPasswordView = document.getElementById("goToResetPasswordView");
+const backFromResetPassword = document.getElementById("backFromResetPassword");
 
 // =========================
 // Auth form buttons
 // =========================
 const signupBtn = document.getElementById("signupBtn");
 const loginBtn = document.getElementById("loginBtn");
+const sendResetCodeBtn = document.getElementById("sendResetCodeBtn");
+const resetPasswordBtn = document.getElementById("resetPasswordBtn");
 
 // =========================
 // Auth form inputs
@@ -58,6 +66,16 @@ const loginEmail = document.getElementById("loginEmail");
 const loginPassword = document.getElementById("loginPassword");
 const toggleSignupPassword = document.getElementById("toggleSignupPassword");
 const toggleLoginPassword = document.getElementById("toggleLoginPassword");
+
+const forgotPasswordEmail = document.getElementById("forgotPasswordEmail");
+const resetPasswordEmail = document.getElementById("resetPasswordEmail");
+const resetPasswordCode = document.getElementById("resetPasswordCode");
+const newPassword = document.getElementById("newPassword");
+const confirmNewPassword = document.getElementById("confirmNewPassword");
+const toggleNewPassword = document.getElementById("toggleNewPassword");
+const toggleConfirmNewPassword = document.getElementById("toggleConfirmNewPassword");
+
+
 
 function setupPasswordToggle(toggleBtn, inputEl) {
   if (!toggleBtn || !inputEl) return;
@@ -78,6 +96,8 @@ function setupPasswordToggle(toggleBtn, inputEl) {
 
 setupPasswordToggle(toggleSignupPassword, signupPassword);
 setupPasswordToggle(toggleLoginPassword, loginPassword);
+setupPasswordToggle(toggleNewPassword, newPassword);
+setupPasswordToggle(toggleConfirmNewPassword, confirmNewPassword);
 
 let lastFocusedFormatField = output;
 
@@ -195,6 +215,8 @@ function hideAllViews() {
   if (signupView) signupView.classList.add("hidden");
   if (loginView) loginView.classList.add("hidden");
   if (generatorView) generatorView.classList.add("hidden");
+  if (forgotPasswordView) forgotPasswordView.classList.add("hidden");
+  if (resetPasswordView) resetPasswordView.classList.add("hidden");
 }
 
 function showView(view) {
@@ -503,6 +525,33 @@ if (goToSignupFromLogin) {
   });
 }
 
+if (goToForgotPassword) {
+  goToForgotPassword.addEventListener("click", () => {
+    showView(forgotPasswordView);
+  });
+}
+
+if (backFromForgotPassword) {
+  backFromForgotPassword.addEventListener("click", () => {
+    showView(loginView);
+  });
+}
+
+if (goToResetPasswordView) {
+  goToResetPasswordView.addEventListener("click", () => {
+    if (forgotPasswordEmail?.value.trim() && resetPasswordEmail) {
+      resetPasswordEmail.value = forgotPasswordEmail.value.trim();
+    }
+    showView(resetPasswordView);
+  });
+}
+
+if (backFromResetPassword) {
+  backFromResetPassword.addEventListener("click", () => {
+    showView(loginView);
+  });
+}
+
 // =========================
 // Signup flow
 // After signup, move to login
@@ -659,6 +708,109 @@ if (logoutBtn) {
       showView(authChoiceView);
       showMessage("Logged out successfully.");
     });
+  });
+}
+
+if (sendResetCodeBtn) {
+  sendResetCodeBtn.addEventListener("click", () => {
+    const email = forgotPasswordEmail?.value.trim();
+
+    if (!email) {
+      showMessage("Please enter your email.");
+      return;
+    }
+
+    setLoading(true, "Sending reset code...");
+    showMessage("");
+
+    chrome.runtime.sendMessage(
+      {
+        type: "SEND_RESET_CODE",
+        payload: {
+          email,
+        },
+      },
+      (response) => {
+        setLoading(false, "Generating post...");
+
+        if (chrome.runtime.lastError) {
+          showMessage("Failed to communicate with extension background script.");
+          return;
+        }
+
+        if (handleApiError(response, "Failed to send reset code.")) {
+          return;
+        }
+
+        if (resetPasswordEmail) {
+          resetPasswordEmail.value = email;
+        }
+
+        showMessage(response?.message || "Reset code sent. Check your email.");
+        showView(resetPasswordView);
+      }
+    );
+  });
+}
+
+if (resetPasswordBtn) {
+  resetPasswordBtn.addEventListener("click", () => {
+    const email = resetPasswordEmail?.value.trim();
+    const code = resetPasswordCode?.value.trim();
+    const password = newPassword?.value.trim();
+    const confirmPassword = confirmNewPassword?.value.trim();
+
+    if (!email || !code || !password || !confirmPassword) {
+      showMessage("Please fill in all reset password fields.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      showMessage("Passwords do not match.");
+      return;
+    }
+
+    setLoading(true, "Resetting password...");
+    showMessage("");
+
+    chrome.runtime.sendMessage(
+      {
+        type: "RESET_PASSWORD",
+        payload: {
+          email,
+          reset_code: code,
+          new_password: password,
+        },
+      },
+      (response) => {
+        setLoading(false, "Generating post...");
+
+        if (chrome.runtime.lastError) {
+          showMessage("Failed to communicate with extension background script.");
+          return;
+        }
+
+        if (handleApiError(response, "Failed to reset password.")) {
+          return;
+        }
+
+        if (forgotPasswordEmail) {
+          forgotPasswordEmail.value = email;
+        }
+
+        if (loginEmail) {
+          loginEmail.value = email;
+        }
+
+        if (resetPasswordCode) resetPasswordCode.value = "";
+        if (newPassword) newPassword.value = "";
+        if (confirmNewPassword) confirmNewPassword.value = "";
+        if (loginPassword) loginPassword.value = "";
+
+        showMessage(response?.message || "Password reset successful. Please log in.");
+        showView(loginView);
+      }
+    );
   });
 }
 
