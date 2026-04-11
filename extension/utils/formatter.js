@@ -1,6 +1,6 @@
 /*
  * linkedin paste helpers:
- * - unicode bold/italic/code and list formatting for copy/paste
+ * - unicode bold/italic/monospace code and list formatting for copy/paste
  * - updates the post textarea by transforming the selected text
  */
 (function (global) {
@@ -13,6 +13,11 @@
   // digits stay ascii because they are not supported by Unicode italic style
   const ITALIC_UPPER = 0x1d608;
   const ITALIC_LOWER = 0x1d622;
+
+  // mathematical MONOSPACE (A–Z, a–z, 0–9)
+  const MONO_UPPER = 0x1d670;
+  const MONO_LOWER = 0x1d68a;
+  const MONO_DIGIT = 0x1d7f6;
 
   // ONE CHARACTER: map one styled unicode to plain ascii when possible
   function decodeCharToAscii(ch) {
@@ -32,6 +37,15 @@
     }
     if (cp >= ITALIC_LOWER && cp <= ITALIC_LOWER + 25) {
       return String.fromCharCode(97 + (cp - ITALIC_LOWER));
+    }
+    if (cp >= MONO_UPPER && cp <= MONO_UPPER + 25) {
+      return String.fromCharCode(65 + (cp - MONO_UPPER));
+    }
+    if (cp >= MONO_LOWER && cp <= MONO_LOWER + 25) {
+      return String.fromCharCode(97 + (cp - MONO_LOWER));
+    }
+    if (cp >= MONO_DIGIT && cp <= MONO_DIGIT + 9) {
+      return String.fromCharCode(48 + (cp - MONO_DIGIT));
     }
 
     return ch;
@@ -91,6 +105,30 @@
     return out;
   }
 
+  // ONE CHARACTER: map one ascii to the unicode MONOSPACE range
+  function encodeCodeChar(ch) {
+    const cp = ch.codePointAt(0);
+    if (cp >= 65 && cp <= 90) {
+      return String.fromCodePoint(MONO_UPPER + (cp - 65));
+    }
+    if (cp >= 97 && cp <= 122) {
+      return String.fromCodePoint(MONO_LOWER + (cp - 97));
+    }
+    if (cp >= 48 && cp <= 57) {
+      return String.fromCodePoint(MONO_DIGIT + (cp - 48));
+    }
+    return ch;
+  }
+
+  // FULL STRING: convert all supported characters to MONOSPACE unicode
+  function encodeCode(str) {
+    let out = "";
+    for (const ch of str) {
+      out += encodeCodeChar(ch);
+    }
+    return out;
+  }
+
   // FULL STRING: detect whether the whole string is already encoded as BOLD sans
   function isBoldSansString(str) {
     const plain = decodeToAscii(str);
@@ -101,6 +139,12 @@
   function isItalicSansString(str) {
     const plain = decodeToAscii(str);
     return encodeItalic(plain) === str;
+  }
+
+  // FULL STRING: detect whether the whole string is already encoded as MONOSPACE
+  function isMonospaceString(str) {
+    const plain = decodeToAscii(str);
+    return encodeCode(plain) === str;
   }
 
   // toggle BOLD on a selected segment while preserving selection bounds
@@ -120,6 +164,7 @@
         value,
         selectionStart: selStart,
         selectionEnd: selStart + plain.length,
+        toggledOff: true,
       };
     }
 
@@ -130,6 +175,7 @@
       value,
       selectionStart: selStart,
       selectionEnd: selStart + out.length,
+      toggledOff: false,
     };
   }
 
@@ -150,6 +196,7 @@
         value,
         selectionStart: selStart,
         selectionEnd: selStart + plain.length,
+        toggledOff: true,
       };
     }
 
@@ -160,66 +207,39 @@
       value,
       selectionStart: selStart,
       selectionEnd: selStart + out.length,
+      toggledOff: false,
     };
   }
 
-  const FENCE_RE = /^```\r?\n([\s\S]*)\r?\n```$/;
+  // toggle MONOSPACE on a selected segment while preserving selection bounds
+  function applyCode(text, selStart, selEnd) {
+    const selected = text.slice(selStart, selEnd);
+    if (!selected) {
+      return null;
+    }
 
-  // wrap a selection in triple-backtick fences (CODE BLOCK) or unwrap if already fenced
-  function applyCodeFence(text, selStart, selEnd) {
     const before = text.slice(0, selStart);
     const after = text.slice(selEnd);
-    const selected = text.slice(selStart, selEnd);
 
-    if (FENCE_RE.test(selected)) {
-      const inner = selected.replace(FENCE_RE, "$1");
-      const value = before + inner + after;
+    if (isMonospaceString(selected)) {
+      const plain = decodeToAscii(selected);
+      const value = before + plain + after;
       return {
         value,
         selectionStart: selStart,
-        selectionEnd: selStart + inner.length,
+        selectionEnd: selStart + plain.length,
+        toggledOff: true,
       };
     }
 
-    // unwrap when the selection is inside an existing fenced CODE block
-    if (
-      (before.endsWith("```\n") && after.startsWith("\n```")) ||
-      (before.endsWith("```\r\n") && after.startsWith("\r\n```"))
-    ) {
-      const opening = before.endsWith("```\r\n") ? "```\r\n" : "```\n";
-      const closing = opening === "```\r\n" ? "\r\n```" : "\n```";
-
-      const inner = selected;
-      const value =
-        before.slice(0, before.length - opening.length) +
-        inner +
-        after.slice(closing.length);
-
-      const newStart = selStart - opening.length;
-      return {
-        value,
-        selectionStart: newStart,
-        selectionEnd: newStart + inner.length,
-      };
-    }
-
-    if (selected.length === 0) {
-      const insertion = "```\n\n```";
-      const value = before + insertion + after;
-      const caret = selStart + 4;
-      return {
-        value,
-        selectionStart: caret,
-        selectionEnd: caret,
-      };
-    }
-
-    const wrapped = "```\n" + selected + "\n```";
-    const value = before + wrapped + after;
+    const plain = decodeToAscii(selected);
+    const out = encodeCode(plain);
+    const value = before + out + after;
     return {
       value,
-      selectionStart: selStart + 4,
-      selectionEnd: selStart + 4 + selected.length,
+      selectionStart: selStart,
+      selectionEnd: selStart + out.length,
+      toggledOff: false,
     };
   }
 
@@ -418,14 +438,39 @@
       value,
       selectionStart: selStart,
       selectionEnd: selStart + out.length,
-      toggledOn: true,
+      toggledOff: false,
+    };
+  }
+
+  // FULL STRING: remove all formatting
+  function applyClearFormatting(text, selStart, selEnd) {
+    const selected = text.slice(selStart, selEnd);
+    if (!selected) {
+      return null;
+    }
+
+    const before = text.slice(0, selStart);
+    const after = text.slice(selEnd);
+
+    let working = selected.split(/\r?\n/).map(stripAnyListPrefix).join("\n");
+    working = decodeToAscii(working);
+
+    const value = before + working + after;
+    const toggledOff = working !== selected;
+
+    return {
+      value,
+      selectionStart: selStart,
+      selectionEnd: selStart + working.length,
+      toggledOff,
     };
   }
 
   global.LinkedInPostFormatter = {
     applyBold,
     applyItalic,
-    applyCodeFence,
+    applyCode,
     applyList,
+    applyClearFormatting,
   };
 })(typeof self !== "undefined" ? self : this);
