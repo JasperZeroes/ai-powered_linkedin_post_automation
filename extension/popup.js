@@ -292,6 +292,10 @@ function applyOutputEdit(targetEl, result) {
   return true;
 }
 
+function showToolbarToggleMessage(result, removedText, appliedText) {
+  showMessage(result.toggledOff ? removedText : appliedText);
+}
+
 function applyEmphasis(kind, emptyMessage) {
   const target = getFormattingTarget();
   if (!target) {
@@ -319,6 +323,13 @@ function applyEmphasis(kind, emptyMessage) {
   }
 
   applyOutputEdit(target, result);
+  if (kind === "bold") {
+    showToolbarToggleMessage(result, "Bold removed.", "Bold applied.");
+  } else if (kind === "italic") {
+    showToolbarToggleMessage(result, "Italics removed.", "Italics applied.");
+  } else {
+    showToolbarToggleMessage(result, "Code removed.", "Code applied.");
+  }
 }
 
 function applyBulletPoints() {
@@ -342,11 +353,8 @@ function applyBulletPoints() {
   }
 
   applyOutputEdit(target, result);
+  showToolbarToggleMessage(result, "Bullet list removed.", "Bullet list applied.");
   return result;
-}
-
-function applyCode() {
-  applyEmphasis("code", "Select text first.");
 }
 
 function applyClearFormatting() {
@@ -370,6 +378,7 @@ function applyClearFormatting() {
   }
 
   applyOutputEdit(target, result);
+  showToolbarToggleMessage(result, "Formatting removed.", "No formatting to remove.");
 }
 
 function applyListFormat(kind) {
@@ -393,6 +402,7 @@ function applyListFormat(kind) {
   }
 
   applyOutputEdit(target, result);
+  showToolbarToggleMessage(result, "Numbered list removed.", "Numbered list applied.");
   return result;
 }
 
@@ -910,7 +920,7 @@ if (bulletBtn) {
 if (codeBtn) {
   codeBtn.addEventListener("click", () => {
     withButtonCooldown(codeBtn, () => {
-      applyCode();
+      applyEmphasis("code", "Select text first.");
     });
   });
 }
@@ -940,51 +950,28 @@ function handleFormatFieldKeydown(e) {
     return;
   }
 
-  const fmt = window.LinkedInPostFormatter;
-  if (!fmt) {
+  if (!window.LinkedInPostFormatter) {
     return;
   }
 
-  const ta = e.target;
-  const start = ta.selectionStart;
-  const end = ta.selectionEnd;
   const key = e.key.toLowerCase();
 
   if (key === "b") {
     e.preventDefault();
-    withButtonCooldown(boldBtn, () => {
-      const result = fmt.applyBold(ta.value, start, end);
-      if (!result) {
-        showMessage("Select text first.");
-        return;
-      }
-      applyOutputEdit(ta, result);
-    });
+    boldBtn?.click();
     return;
   }
 
   if (key === "i") {
     e.preventDefault();
-    withButtonCooldown(italicBtn, () => {
-      const result = fmt.applyItalic(ta.value, start, end);
-      if (!result) {
-        showMessage("Select text first.");
-        return;
-      }
-      applyOutputEdit(ta, result);
-    });
+    italicBtn?.click();
     return;
   }
 
   if (key === "r") {
-    const result = fmt.applyClearFormatting(ta.value, start, end);
-    if (!result) {
-      return;
-    }
     e.preventDefault();
-    withButtonCooldown(clearFormatBtn, () => {
-      applyOutputEdit(ta, result);
-    });
+    clearFormatBtn?.click();
+    return;
   }
 }
 

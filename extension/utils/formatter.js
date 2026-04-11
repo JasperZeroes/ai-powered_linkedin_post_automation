@@ -164,6 +164,7 @@
         value,
         selectionStart: selStart,
         selectionEnd: selStart + plain.length,
+        toggledOff: true,
       };
     }
 
@@ -174,6 +175,7 @@
       value,
       selectionStart: selStart,
       selectionEnd: selStart + out.length,
+      toggledOff: false,
     };
   }
 
@@ -194,6 +196,7 @@
         value,
         selectionStart: selStart,
         selectionEnd: selStart + plain.length,
+        toggledOff: true,
       };
     }
 
@@ -204,6 +207,7 @@
       value,
       selectionStart: selStart,
       selectionEnd: selStart + out.length,
+      toggledOff: false,
     };
   }
 
@@ -224,6 +228,7 @@
         value,
         selectionStart: selStart,
         selectionEnd: selStart + plain.length,
+        toggledOff: true,
       };
     }
 
@@ -234,6 +239,7 @@
       value,
       selectionStart: selStart,
       selectionEnd: selStart + out.length,
+      toggledOff: false,
     };
   }
 
@@ -432,7 +438,7 @@
       value,
       selectionStart: selStart,
       selectionEnd: selStart + out.length,
-      toggledOn: true,
+      toggledOff: false,
     };
   }
 
@@ -450,11 +456,13 @@
     working = decodeToAscii(working);
 
     const value = before + working + after;
+    const toggledOff = working !== selected;
 
     return {
       value,
       selectionStart: selStart,
       selectionEnd: selStart + working.length,
+      toggledOff,
     };
   }
 
