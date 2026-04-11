@@ -17,8 +17,8 @@
         </p>
       </div>
 
-      <button id="showSignupBtn">Create Account</button>
-      <button id="showLoginBtn" class="secondary-btn">Login</button>
+      <button type="button" id="showSignupBtn" class="auth-cta-btn">Create Account</button>
+      <button type="button" id="showLoginBtn" class="auth-cta-btn secondary-btn">Login</button>
     </div>
 
     <!-- Signup View -->
@@ -65,8 +65,17 @@
         </button>
       </div>
 
-      <button id="signupBtn">Sign Up</button>
-      <button type="button" class="secondary-btn google-auth-btn js-google-auth">Continue with Google</button>
+      <button type="button" id="signupBtn" class="auth-cta-btn">Sign Up</button>
+      <button type="button" class="auth-cta-btn secondary-btn google-auth-btn js-google-auth">
+        <img
+          src="icons/google-logo.svg"
+          alt=""
+          class="google-auth-btn__logo"
+          width="23"
+          height="23"
+        />
+        <span class="google-auth-btn__label">Continue with Google</span>
+      </button>
 
       <p class="switch-text">
         Already have an account?
@@ -115,8 +124,17 @@
         </button>
       </div>
 
-      <button id="loginBtn">Login</button>
-      <button type="button" class="secondary-btn google-auth-btn js-google-auth">Continue with Google</button>
+      <button type="button" id="loginBtn" class="auth-cta-btn">Login</button>
+      <button type="button" class="auth-cta-btn secondary-btn google-auth-btn js-google-auth">
+        <img
+          src="icons/google-logo.svg"
+          alt=""
+          class="google-auth-btn__logo"
+          width="23"
+          height="23"
+        />
+        <span class="google-auth-btn__label">Continue with Google</span>
+      </button>
 
       <p class="switch-text">
         Don’t have an account?
@@ -197,7 +215,7 @@
       <button id="generateBtn">Generate Post</button>
       <div id="loading" class="loading hidden">
         <span class="spinner"></span>
-        <span>Generating post...</span>
+        <span id="loadingText">Generating post...</span>
       </div>
 
       <p class="format-toolbar-hint">Format selected text in any field below (post, hashtags, or CTA).</p>

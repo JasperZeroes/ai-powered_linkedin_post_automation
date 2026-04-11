@@ -27,7 +27,6 @@ const loadingText = document.getElementById("loadingText");
 const authChoiceView = document.getElementById("authChoiceView");
 const signupView = document.getElementById("signupView");
 const loginView = document.getElementById("loginView");
-const otpView = document.getElementById("otpView");
 const generatorView = document.getElementById("generatorView");
 
 // =========================
@@ -37,18 +36,14 @@ const showSignupBtn = document.getElementById("showSignupBtn");
 const showLoginBtn = document.getElementById("showLoginBtn");
 const backFromSignup = document.getElementById("backFromSignup");
 const backFromLogin = document.getElementById("backFromLogin");
-const backFromOtp = document.getElementById("backFromOtp");
 const goToLoginFromSignup = document.getElementById("goToLoginFromSignup");
 const goToSignupFromLogin = document.getElementById("goToSignupFromLogin");
-const goBackToSignupFromOtp = document.getElementById("goBackToSignupFromOtp");
 
 // =========================
 // Auth form buttons
 // =========================
 const signupBtn = document.getElementById("signupBtn");
 const loginBtn = document.getElementById("loginBtn");
-const verifyOtpBtn = document.getElementById("verifyOtpBtn");
-const resendOtpBtn = document.getElementById("resendOtpBtn");
 
 // =========================
 // Auth form inputs
@@ -61,9 +56,6 @@ const loginEmail = document.getElementById("loginEmail");
 const loginPassword = document.getElementById("loginPassword");
 const toggleSignupPassword = document.getElementById("toggleSignupPassword");
 const toggleLoginPassword = document.getElementById("toggleLoginPassword");
-const otpEmailHint = document.getElementById("otpEmailHint");
-const otpInputs = Array.from(document.querySelectorAll(".otp-digit"));
-const RESEND_COOLDOWN_SECONDS = 30;
 
 function setupPasswordToggle(toggleBtn, inputEl) {
   if (!toggleBtn || !inputEl) return;
@@ -85,110 +77,6 @@ function setupPasswordToggle(toggleBtn, inputEl) {
 setupPasswordToggle(toggleSignupPassword, signupPassword);
 setupPasswordToggle(toggleLoginPassword, loginPassword);
 
-let pendingVerificationEmail = "";
-let resendCooldownTimer = null;
-let resendCooldownRemaining = 0;
-let uiLoading = false;
-
-function updateResendOtpButton() {
-  if (!resendOtpBtn) {
-    return;
-  }
-
-  resendOtpBtn.disabled = uiLoading || resendCooldownRemaining > 0;
-
-  if (resendCooldownRemaining > 0) {
-    resendOtpBtn.textContent = `Resend OTP (${resendCooldownRemaining}s)`;
-  } else {
-    resendOtpBtn.textContent = "Resend OTP";
-  }
-}
-
-function startResendCooldown(seconds = RESEND_COOLDOWN_SECONDS) {
-  resendCooldownRemaining = seconds;
-  updateResendOtpButton();
-
-  if (resendCooldownTimer) {
-    clearInterval(resendCooldownTimer);
-    resendCooldownTimer = null;
-  }
-
-  resendCooldownTimer = setInterval(() => {
-    resendCooldownRemaining = Math.max(0, resendCooldownRemaining - 1);
-    updateResendOtpButton();
-
-    if (resendCooldownRemaining === 0) {
-      clearInterval(resendCooldownTimer);
-      resendCooldownTimer = null;
-    }
-  }, 1000);
-}
-
-function setPendingVerificationEmail(email) {
-  pendingVerificationEmail = email || "";
-  if (otpEmailHint) {
-    otpEmailHint.textContent = pendingVerificationEmail || "your email";
-  }
-}
-
-function getOtpCode() {
-  return otpInputs.map((input) => input.value).join("");
-}
-
-function clearOtpInputs() {
-  otpInputs.forEach((input) => {
-    input.value = "";
-  });
-
-  if (otpInputs[0]) {
-    otpInputs[0].focus();
-  }
-}
-
-function setupOtpInputs() {
-  if (!otpInputs.length) {
-    return;
-  }
-
-  otpInputs.forEach((input, index) => {
-    input.addEventListener("input", (event) => {
-      const value = event.target.value.replace(/\D/g, "");
-      event.target.value = value.slice(-1);
-
-      if (event.target.value && index < otpInputs.length - 1) {
-        otpInputs[index + 1].focus();
-      }
-    });
-
-    input.addEventListener("keydown", (event) => {
-      if (event.key === "Backspace" && !input.value && index > 0) {
-        otpInputs[index - 1].focus();
-      }
-    });
-
-    input.addEventListener("paste", (event) => {
-      const pasted = (event.clipboardData?.getData("text") || "").replace(/\D/g, "");
-      if (!pasted) {
-        return;
-      }
-
-      event.preventDefault();
-      const chars = pasted.slice(0, otpInputs.length).split("");
-      chars.forEach((ch, i) => {
-        if (otpInputs[i]) {
-          otpInputs[i].value = ch;
-        }
-      });
-
-      const next = Math.min(chars.length, otpInputs.length - 1);
-      otpInputs[next]?.focus();
-    });
-  });
-}
-
-setupOtpInputs();
-updateResendOtpButton();
-
 let lastFocusedFormatField = output;
 
 [output, hashtagsOutput, ctaOutput].forEach((el) => {
@@ -207,8 +95,6 @@ function showMessage(message) {
 }
 
 function setLoading(isLoading, text = "Generating post...") {
-  uiLoading = isLoading;
-
   if (loading) {
     loading.classList.toggle("hidden", !isLoading);
   }
@@ -233,11 +119,9 @@ function setLoading(isLoading, text = "Generating post...") {
     loginBtn.disabled = isLoading;
   }
 
-  if (verifyOtpBtn) {
-    verifyOtpBtn.disabled = isLoading;
-  }
-
-  updateResendOtpButton();
+  document.querySelectorAll(".js-google-auth").forEach((btn) => {
+    btn.disabled = isLoading;
+  });
 }
 
 // =========================
@@ -277,7 +161,6 @@ function hideAllViews() {
   if (authChoiceView) authChoiceView.classList.add("hidden");
   if (signupView) signupView.classList.add("hidden");
   if (loginView) loginView.classList.add("hidden");
-  if (otpView) otpView.classList.add("hidden");
   if (generatorView) generatorView.classList.add("hidden");
 }
 
@@ -583,12 +466,6 @@ if (backFromLogin) {
   });
 }
 
-if (backFromOtp) {
-  backFromOtp.addEventListener("click", () => {
-    showView(loginView);
-  });
-}
-
 if (goToLoginFromSignup) {
   goToLoginFromSignup.addEventListener("click", () => {
     showView(loginView);
@@ -601,15 +478,9 @@ if (goToSignupFromLogin) {
   });
 }
 
-if (goBackToSignupFromOtp) {
-  goBackToSignupFromOtp.addEventListener("click", () => {
-    showView(signupView);
-  });
-}
-
 // =========================
 // Signup flow
-// After signup, move to OTP view
+// After signup, move to login
 // =========================
 if (signupBtn) {
   signupBtn.addEventListener("click", () => {
@@ -643,22 +514,14 @@ if (signupBtn) {
         }
 
         if (handleApiError(response, "Signup failed.")) {
-          const unverifiedExists = String(response?.message || "")
-            .toLowerCase()
-            .includes("not verified");
-          if (unverifiedExists && email) {
-            setPendingVerificationEmail(email);
-            clearOtpInputs();
-            showView(otpView);
-          }
           return;
         }
 
-        setPendingVerificationEmail(email);
-        clearOtpInputs();
-        startResendCooldown();
-        showView(otpView);
-        showMessage("Account created. Enter the OTP sent to your email.");
+        if (loginEmail) {
+          loginEmail.value = email;
+        }
+        showMessage("Account created successfully. Please log in.");
+        showView(loginView);
       }
     );
   });
@@ -698,14 +561,6 @@ if (loginBtn) {
         }
 
         if (handleApiError(response, "Login failed.")) {
-          const notVerified = String(response?.message || "")
-            .toLowerCase()
-            .includes("not verified");
-          if (notVerified && email) {
-            setPendingVerificationEmail(email);
-            clearOtpInputs();
-            showView(otpView);
-          }
           return;
         }
 
@@ -716,100 +571,29 @@ if (loginBtn) {
   });
 }
 
-if (verifyOtpBtn) {
-  verifyOtpBtn.addEventListener("click", () => {
-    const otp = getOtpCode();
-    const email = (
-      pendingVerificationEmail ||
-      signupEmail?.value ||
-      loginEmail?.value ||
-      ""
-    ).trim();
-
-    if (!email) {
-      showMessage("Enter your email first by signing up or logging in.");
-      showView(loginView);
-      return;
-    }
-
-    if (!/^\d{6}$/.test(otp)) {
-      showMessage("Please enter the 6-digit OTP code.");
-      return;
-    }
-
-    setLoading(true);
+document.querySelectorAll(".js-google-auth").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    setLoading(true, "Signing in with Google...");
     showMessage("");
 
-    chrome.runtime.sendMessage(
-      {
-        type: "VERIFY_EMAIL_OTP",
-        payload: {
-          email,
-          otp,
-        },
-      },
-      (response) => {
-        setLoading(false);
+    chrome.runtime.sendMessage({ type: "GOOGLE_AUTH" }, (response) => {
+      setLoading(false, "Generating post...");
 
-        if (chrome.runtime.lastError) {
-          showMessage("Failed to communicate with extension background script.");
-          return;
-        }
-
-        if (handleApiError(response, "OTP verification failed.")) {
-          return;
-        }
-
-        showMessage("Email verified. You are now logged in.");
-        showView(generatorView);
+      if (chrome.runtime.lastError) {
+        showMessage("Failed to communicate with extension background script.");
+        return;
       }
-    );
-  });
-}
 
-if (resendOtpBtn) {
-  resendOtpBtn.addEventListener("click", () => {
-    const email = (
-      pendingVerificationEmail ||
-      signupEmail?.value ||
-      loginEmail?.value ||
-      ""
-    ).trim();
-
-    if (!email) {
-      showMessage("Email is required to resend OTP.");
-      return;
-    }
-
-    setLoading(true);
-    showMessage("");
-
-    chrome.runtime.sendMessage(
-      {
-        type: "RESEND_EMAIL_OTP",
-        payload: {
-          email,
-        },
-      },
-      (response) => {
-        setLoading(false);
-
-        if (chrome.runtime.lastError) {
-          showMessage("Failed to communicate with extension background script.");
-          return;
-        }
-
-        if (handleApiError(response, "Failed to resend OTP.")) {
-          return;
-        }
-
-        startResendCooldown();
-        showMessage("A new OTP has been sent to your email.");
+      if (handleApiError(response, "Google sign-in failed.")) {
+        return;
       }
-    );
-  });
-}
 
+      showMessage(response?.message || "Signed in with Google.");
+      showView(generatorView);
+      loadFromLocal();
+    });
+  });
+});
 
 // =========================
 // Generator actions
