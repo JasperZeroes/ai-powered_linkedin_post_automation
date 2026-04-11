@@ -15,6 +15,7 @@ const bulletBtn = document.getElementById("bulletBtn");
 const listMenuBtn = document.getElementById("listMenuBtn");
 const listMenu = document.getElementById("listMenu");
 const codeBtn = document.getElementById("codeBtn");
+const clearFormatBtn = document.getElementById("clearFormatBtn");
 const loading = document.getElementById("loading");
 const messageBox = document.getElementById("message");
 const saveDraftBtn = document.getElementById("saveDraftBtn");
@@ -84,6 +85,7 @@ let lastFocusedFormatField = output;
   el.addEventListener("focusin", () => {
     lastFocusedFormatField = el;
   });
+  el.addEventListener("keydown", handleFormatFieldKeydown);
 });
 
 // =========================
@@ -92,6 +94,34 @@ let lastFocusedFormatField = output;
 function showMessage(message) {
   if (!messageBox) return;
   messageBox.textContent = message;
+}
+
+const BUTTON_COOLDOWN_MS = 1000;
+
+// briefly disabled certain buttons after click to prevent spamming during cooldown period
+function withButtonCooldown(btn, action) {
+  if (btn && btn.disabled) {
+    return;
+  }
+
+  const armRelease = () => {
+    if (!btn) {
+      return;
+    }
+    setTimeout(() => {
+      btn.classList.remove("cooldown", "active");
+      btn.disabled = false;
+    }, BUTTON_COOLDOWN_MS);
+  };
+
+  if (btn) {
+    btn.disabled = true;
+    btn.classList.add("cooldown", "active");
+  }
+
+  Promise.resolve()
+    .then(() => action())
+    .then(armRelease, armRelease);
 }
 
 function setLoading(isLoading, text = "Generating post...") {
@@ -125,7 +155,7 @@ function setLoading(isLoading, text = "Generating post...") {
 }
 
 // =========================
-// Save to local Storage
+// Save to local storage
 // =========================
 function saveToLocal() {
   const backup = {
@@ -138,9 +168,8 @@ function saveToLocal() {
 }
 
 // ===========================
-// Load from local
+// Load from local storage
 // ===========================
-
 function loadFromLocal() {
   const saved = localStorage.getItem("generatedPost");
   if (!saved) return;
@@ -155,7 +184,6 @@ function loadFromLocal() {
     console.error("Failed to parse local storage", e);
   }
 }
-
 
 function hideAllViews() {
   if (authChoiceView) authChoiceView.classList.add("hidden");
@@ -241,45 +269,6 @@ function downloadDraftTxt(payload) {
 // =========================
 // Text formatting
 // =========================
-let activeFormatButton = null;
-
-function setActiveFormatButton(btn) {
-  if (!btn) return;
-
-  if (activeFormatButton === btn) {
-    btn.classList.remove("active");
-    activeFormatButton = null;
-    return;
-  }
-
-  if (activeFormatButton) {
-    activeFormatButton.classList.remove("active");
-  }
-
-  btn.classList.add("active");
-  activeFormatButton = btn;
-}
-
-function activateFormatButton(btn) {
-  if (!btn) return;
-
-  if (activeFormatButton && activeFormatButton !== btn) {
-    activeFormatButton.classList.remove("active");
-  }
-
-  btn.classList.add("active");
-  activeFormatButton = btn;
-}
-
-function deactivateFormatButton(btn) {
-  if (!btn) return;
-
-  btn.classList.remove("active");
-  if (activeFormatButton === btn) {
-    activeFormatButton = null;
-  }
-}
-
 function getFormattingTarget() {
   const fields = [output, hashtagsOutput, ctaOutput].filter(Boolean);
   const active = document.activeElement;
@@ -322,7 +311,7 @@ function applyEmphasis(kind, emptyMessage) {
       ? fmt.applyBold(target.value, start, end)
       : kind === "italic"
         ? fmt.applyItalic(target.value, start, end)
-        : fmt.applyCodeFence(target.value, start, end);
+        : fmt.applyCode(target.value, start, end);
 
   if (!result) {
     showMessage(emptyMessage);
@@ -356,8 +345,31 @@ function applyBulletPoints() {
   return result;
 }
 
-function applyCodeFence() {
+function applyCode() {
   applyEmphasis("code", "Select text first.");
+}
+
+function applyClearFormatting() {
+  const target = getFormattingTarget();
+  if (!target) {
+    return;
+  }
+
+  const fmt = window.LinkedInPostFormatter;
+  if (!fmt || typeof fmt.applyClearFormatting !== "function") {
+    return;
+  }
+
+  const start = target.selectionStart;
+  const end = target.selectionEnd;
+  const result = fmt.applyClearFormatting(target.value, start, end);
+
+  if (!result) {
+    showMessage("Select text first.");
+    return;
+  }
+
+  applyOutputEdit(target, result);
 }
 
 function applyListFormat(kind) {
@@ -411,12 +423,9 @@ if (listMenuBtn && listMenu) {
       e.stopPropagation();
       const kind = btn.getAttribute("data-list-kind");
       if (kind) {
-        const result = applyListFormat(kind);
-        if (result?.toggledOff) {
-          deactivateFormatButton(listMenuBtn);
-        } else {
-          activateFormatButton(listMenuBtn);
-        }
+        withButtonCooldown(listMenuBtn, () => {
+          applyListFormat(kind);
+        });
       }
       closeListMenu();
     });
@@ -743,87 +752,61 @@ if (saveDraftBtn) {
   });
 }
 
-const COPY_COOLDOWN_MS = 1500;
-
 // copy buttons for each textarea
 document.querySelectorAll(".textarea-copy-btn").forEach((btn) => {
-  btn.addEventListener("click", async () => {
-    if (btn.disabled) return;
-
+  btn.addEventListener("click", () => {
     const id = btn.getAttribute("data-copy-target");
     const ta = id ? document.getElementById(id) : null;
-    if (!ta) return;
+    if (!ta) {
+      return;
+    }
 
-    try {
-      btn.disabled = true;
-      btn.classList.add("cooldown");
-      setActiveFormatButton(btn);
-
+    withButtonCooldown(btn, async () => {
       const text = (ta.value || "").trim();
       if (!text) {
         showMessage("Nothing to copy yet.");
         return;
       }
 
-      await navigator.clipboard.writeText(text);
-
-      if (id === "output") {
-        showMessage("Copied post.");
-      } else if (id === "hashtagsOutput") {
-        showMessage("Copied hashtags.");
-      } else {
-        showMessage("Copied CTA.");
-      }
-    } catch (error) {
-      showMessage("Failed to copy.");
-    } finally {
-      setTimeout(() => {
-        btn.classList.remove("cooldown");
-        btn.disabled = false;
-        if (activeFormatButton === btn) {
-          btn.classList.remove("active");
-          activeFormatButton = null;
+      try {
+        await navigator.clipboard.writeText(text);
+        if (id === "output") {
+          showMessage("Copied post.");
+        } else if (id === "hashtagsOutput") {
+          showMessage("Copied hashtags.");
+        } else {
+          showMessage("Copied CTA.");
         }
-      }, COPY_COOLDOWN_MS);
-    }
+      } catch (error) {
+        showMessage("Failed to copy.");
+      }
+    });
   });
 });
 
 // "Copy All Texts" button
 if (copyAllBtn) {
-  copyAllBtn.addEventListener("click", async () => {
-    if (copyAllBtn.disabled) return;
-
-    try {
-      copyAllBtn.disabled = true;
-      copyAllBtn.classList.add("cooldown");
-      setActiveFormatButton(copyAllBtn);
-
-      // join generated post, hashtags, and CTA sections without stripping formatting
+  copyAllBtn.addEventListener("click", () => {
+    withButtonCooldown(copyAllBtn, async () => {
       const postText = (output?.value || "").trimEnd();
       const hashtagsText = (hashtagsOutput?.value || "").trimEnd();
       const ctaText = (ctaOutput?.value || "").trimEnd();
-      const combinedText = [postText, ctaText, hashtagsText].filter((s) => s.length > 0).join("\n\n");
+      const combinedText = [postText, ctaText, hashtagsText]
+        .filter((s) => s.length > 0)
+        .join("\n\n");
 
       if (!combinedText) {
         showMessage("Nothing to copy yet.");
         return;
       }
 
-      await navigator.clipboard.writeText(combinedText);
-      showMessage("Copied post, CTA, and hashtags.");
-    } catch (error) {
-      showMessage("Failed to copy.");
-    } finally {
-      setTimeout(() => {
-        copyAllBtn.classList.remove("cooldown");
-        copyAllBtn.disabled = false;
-        if (activeFormatButton === copyAllBtn) {
-          copyAllBtn.classList.remove("active");
-          activeFormatButton = null;
-        }
-      }, COPY_COOLDOWN_MS);
-    }
+      try {
+        await navigator.clipboard.writeText(combinedText);
+        showMessage("Copied post, CTA, and hashtags.");
+      } catch (error) {
+        showMessage("Failed to copy.");
+      }
+    });
   });
 }
 
@@ -902,37 +885,110 @@ if (insertBtn) {
 // =========================
 if (boldBtn) {
   boldBtn.addEventListener("click", () => {
-    applyEmphasis("bold", "Select text first.");
-    setActiveFormatButton(boldBtn);
+    withButtonCooldown(boldBtn, () => {
+      applyEmphasis("bold", "Select text first.");
+    });
   });
 }
 
 if (italicBtn) {
   italicBtn.addEventListener("click", () => {
-    applyEmphasis("italic", "Select text first.");
-    setActiveFormatButton(italicBtn);
+    withButtonCooldown(italicBtn, () => {
+      applyEmphasis("italic", "Select text first.");
+    });
   });
 }
 
 if (bulletBtn) {
   bulletBtn.addEventListener("click", () => {
-    const result = applyBulletPoints();
-    if (result?.toggledOff) {
-      deactivateFormatButton(bulletBtn);
-    } else {
-      setActiveFormatButton(bulletBtn);
-    }
+    withButtonCooldown(bulletBtn, () => {
+      applyBulletPoints();
+    });
   });
 }
 
 if (codeBtn) {
   codeBtn.addEventListener("click", () => {
-    applyCodeFence();
-    setActiveFormatButton(codeBtn);
+    withButtonCooldown(codeBtn, () => {
+      applyCode();
+    });
   });
 }
 
-// Auto-save when user types or edits the generated text
+if (clearFormatBtn) {
+  clearFormatBtn.addEventListener("click", () => {
+    withButtonCooldown(clearFormatBtn, () => {
+      applyClearFormatting();
+    });
+  });
+}
+
+// =========================
+// Keyboard shortcuts for text formatting
+// =========================
+function isFormatShortcutModifier(e) {
+  return e.ctrlKey || e.metaKey;
+}
+
+function handleFormatFieldKeydown(e) {
+  if (!isFormatShortcutModifier(e)) {
+    return;
+  }
+
+  const fields = [output, hashtagsOutput, ctaOutput].filter(Boolean);
+  if (!fields.includes(e.target)) {
+    return;
+  }
+
+  const fmt = window.LinkedInPostFormatter;
+  if (!fmt) {
+    return;
+  }
+
+  const ta = e.target;
+  const start = ta.selectionStart;
+  const end = ta.selectionEnd;
+  const key = e.key.toLowerCase();
+
+  if (key === "b") {
+    e.preventDefault();
+    withButtonCooldown(boldBtn, () => {
+      const result = fmt.applyBold(ta.value, start, end);
+      if (!result) {
+        showMessage("Select text first.");
+        return;
+      }
+      applyOutputEdit(ta, result);
+    });
+    return;
+  }
+
+  if (key === "i") {
+    e.preventDefault();
+    withButtonCooldown(italicBtn, () => {
+      const result = fmt.applyItalic(ta.value, start, end);
+      if (!result) {
+        showMessage("Select text first.");
+        return;
+      }
+      applyOutputEdit(ta, result);
+    });
+    return;
+  }
+
+  if (key === "r") {
+    const result = fmt.applyClearFormatting(ta.value, start, end);
+    if (!result) {
+      return;
+    }
+    e.preventDefault();
+    withButtonCooldown(clearFormatBtn, () => {
+      applyOutputEdit(ta, result);
+    });
+  }
+}
+
+// auto-save when user types or edits the generated text
 [output, hashtagsOutput, ctaOutput, promptInput].forEach(el => {
   if (el) {
     el.addEventListener("input", saveToLocal);
