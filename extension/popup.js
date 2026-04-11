@@ -289,6 +289,7 @@ function applyOutputEdit(targetEl, result) {
   targetEl.value = result.value;
   targetEl.focus();
   targetEl.setSelectionRange(result.selectionStart, result.selectionEnd);
+  saveToLocal();
   return true;
 }
 
