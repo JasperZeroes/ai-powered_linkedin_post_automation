@@ -13,10 +13,15 @@ CREATE TABLE IF NOT EXISTS users (
   account_status VARCHAR(30) NOT NULL DEFAULT 'active'
     CHECK (account_status IN ('active', 'suspended', 'pending_verification')),
   email_verified BOOLEAN NOT NULL DEFAULT FALSE,
+  password_reset_code_hash TEXT,
+  password_reset_expires_at TIMESTAMPTZ,
   -- deleted this because, it can be queried from the user event section instead of saving it as a field
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_code_hash TEXT;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS password_reset_expires_at TIMESTAMPTZ;
 
 CREATE TABLE IF NOT EXISTS drafts (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -720,12 +720,36 @@ if (sendResetCodeBtn) {
       return;
     }
 
-    if (resetPasswordEmail) {
-      resetPasswordEmail.value = email;
-    }
+    setLoading(true, "Sending reset code...");
+    showMessage("");
 
-    showMessage("Reset code request submitted. Check your email.");
-    showView(resetPasswordView);
+    chrome.runtime.sendMessage(
+      {
+        type: "SEND_RESET_CODE",
+        payload: {
+          email,
+        },
+      },
+      (response) => {
+        setLoading(false, "Generating post...");
+
+        if (chrome.runtime.lastError) {
+          showMessage("Failed to communicate with extension background script.");
+          return;
+        }
+
+        if (handleApiError(response, "Failed to send reset code.")) {
+          return;
+        }
+
+        if (resetPasswordEmail) {
+          resetPasswordEmail.value = email;
+        }
+
+        showMessage(response?.message || "Reset code sent. Check your email.");
+        showView(resetPasswordView);
+      }
+    );
   });
 }
 
@@ -746,7 +770,47 @@ if (resetPasswordBtn) {
       return;
     }
 
-    showMessage("Reset password flow UI is ready. Backend wiring comes next.");
+    setLoading(true, "Resetting password...");
+    showMessage("");
+
+    chrome.runtime.sendMessage(
+      {
+        type: "RESET_PASSWORD",
+        payload: {
+          email,
+          reset_code: code,
+          new_password: password,
+        },
+      },
+      (response) => {
+        setLoading(false, "Generating post...");
+
+        if (chrome.runtime.lastError) {
+          showMessage("Failed to communicate with extension background script.");
+          return;
+        }
+
+        if (handleApiError(response, "Failed to reset password.")) {
+          return;
+        }
+
+        if (forgotPasswordEmail) {
+          forgotPasswordEmail.value = email;
+        }
+
+        if (loginEmail) {
+          loginEmail.value = email;
+        }
+
+        if (resetPasswordCode) resetPasswordCode.value = "";
+        if (newPassword) newPassword.value = "";
+        if (confirmNewPassword) confirmNewPassword.value = "";
+        if (loginPassword) loginPassword.value = "";
+
+        showMessage(response?.message || "Password reset successful. Please log in.");
+        showView(loginView);
+      }
+    );
   });
 }
 

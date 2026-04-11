@@ -7,7 +7,12 @@ const {
   exchangeGoogleAuthCode,
   verifyGoogleIdToken,
 } = require("../config/googleAuthConfig");
-const { validateSignup, validateLogin } = require("../validators/auth.validator");
+const {
+  validateSignup,
+  validateLogin,
+  validateForgotPassword,
+  validateResetPassword,
+} = require("../validators/auth.validator");
 
 // Updated repository imports based on the new schema needs
 const {
@@ -16,7 +21,12 @@ const {
   findUserById,
   createSession,
   initUserPreferences,
+  savePasswordResetCode,
+  findUserByEmailAndResetCode,
+  updateUserPassword,
+  clearPasswordResetCode,
 } = require("../services/userRepository");
+const { sendPasswordResetCodeEmail } = require("../services/emailService");
 const { logSignupEvent, logLoginEvent } = require("../services/eventService");
 
 // Helper to generate JWT access token
@@ -31,6 +41,10 @@ function signToken(user) {
 // Helper to generate a random Refresh Token
 function generateRefreshToken() {
   return crypto.randomBytes(40).toString("hex");
+}
+
+function generatePasswordResetCode() {
+  return String(Math.floor(100000 + Math.random() * 900000)); //
 }
 
 // ------
@@ -182,6 +196,117 @@ async function login(req, res, next) {
   }
 }
 
+async function forgotPassword(req, res, next) {
+  try {
+    const { email } = req.body || {};
+
+    const { isValid, errors } = validateForgotPassword({ email });
+    if (!isValid) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors,
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await findUserByEmail(normalizedEmail);
+
+    // Do not reveal whether the email exists or not
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message: "If an account with that email exists, a reset code has been sent.",
+      });
+    }
+
+    const resetCode = generatePasswordResetCode();
+    const resetCodeHash = await bcrypt.hash(resetCode, 10);
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+
+    await savePasswordResetCode({
+      userId: user.id,
+      resetCodeHash,
+      expiresAt,
+    });
+
+    await sendPasswordResetCodeEmail({
+      to: user.email,
+      fullName: user.full_name,
+      resetCode,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "If an account with that email exists, a reset code has been sent.",
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function resetPassword(req, res, next) {
+  try {
+    const { email, reset_code: resetCode, new_password: newPassword } = req.body || {};
+
+    const { isValid, errors } = validateResetPassword({
+      email,
+      reset_code: resetCode,
+      new_password: newPassword,
+    });
+
+    if (!isValid) {
+      return res.status(400).json({
+        success: false,
+        message: "Validation failed",
+        errors,
+      });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await findUserByEmailAndResetCode(normalizedEmail);
+
+    if (!user || !user.password_reset_code_hash || !user.password_reset_expires_at) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired reset code.",
+      });
+    }
+
+    const isExpired = new Date(user.password_reset_expires_at) < new Date();
+    if (isExpired) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired reset code.",
+      });
+    }
+
+    const codeMatches = await bcrypt.compare(resetCode, user.password_reset_code_hash);
+    if (!codeMatches) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired reset code.",
+      });
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, 12);
+
+    await updateUserPassword({
+      userId: user.id,
+      passwordHash: newPasswordHash,
+    });
+
+    await clearPasswordResetCode(user.id);
+
+    return res.status(200).json({
+      success: true,
+      message: "Password reset successful. Please log in.",
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 // ----------------------
 // Google: Signup / Login
 // ----------------------
@@ -326,6 +451,8 @@ async function me(req, res, next) {
 module.exports = {
   signup,
   login,
+  forgotPassword,
+  resetPassword,
   googleSignupLogin,
   me,
 };

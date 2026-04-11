@@ -48,7 +48,51 @@ function validateLogin(data) {
   };
 }
 
+function validateForgotPassword(data) {
+  const errors = {};
+
+  if (!data.email || typeof data.email !== "string" || !data.email.trim()) {
+    errors.email = "Email is required";
+  } else if (!isValidEmail(data.email.trim())) {
+    errors.email = "Email is invalid";
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+  };
+}
+
+function validateResetPassword(data) {
+  const errors = {};
+
+  if (!data.email || typeof data.email !== "string" || !data.email.trim()) {
+    errors.email = "Email is required";
+  } else if (!isValidEmail(data.email.trim())) {
+    errors.email = "Email is invalid";
+  }
+
+  if (!data.reset_code || typeof data.reset_code !== "string" || !data.reset_code.trim()) {
+    errors.reset_code = "Reset code is required";
+  } else if (!/^\d{6}$/.test(data.reset_code.trim())) {
+    errors.reset_code = "Reset code must be a 6-digit number";
+  }
+
+  if (!data.new_password || typeof data.new_password !== "string") {
+    errors.new_password = "New password is required";
+  } else if (data.new_password.length < 8) {
+    errors.new_password = "New password must be at least 8 characters";
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+  };
+}
+
 module.exports = {
   validateSignup,
   validateLogin,
+  validateForgotPassword,
+  validateResetPassword,
 };
