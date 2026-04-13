@@ -1,18 +1,18 @@
 const pool = require("../config/database");
 
-async function createUser({
-  fullName,
-  email,
-  passwordHash,
-  authProvider = "local",
-  profileImageUrl = null,
-}) {
+async function createUser({ fullName, email, passwordHash }) {
   const query = `
-    INSERT INTO users (full_name, email, password_hash, auth_provider, profile_image_url)
-    VALUES ($1, $2, $3, $4, $5)
-    RETURNING id, full_name, email, auth_provider, created_at
+    INSERT INTO users (
+      full_name,
+      email,
+      password_hash,
+      account_status,
+      email_verified
+    )
+    VALUES ($1, $2, $3, 'pending_verification', FALSE)
+    RETURNING id, full_name, email, account_status, email_verified, created_at
   `;
-  const values = [fullName, email, passwordHash, authProvider, profileImageUrl];
+  const values = [fullName, email, passwordHash];
   const result = await pool.query(query, values);
   return result.rows[0];
 }
@@ -55,7 +55,9 @@ async function initUserPreferences(userId) {
   const result = await pool.query(query, [userId]);
   // If already exists, fetch existing
   if (result.rows.length === 0) {
-    const existing = await pool.query("SELECT * FROM user_preferences WHERE user_id = $1", [userId]);
+    const existing = await pool.query("SELECT * FROM user_preferences WHERE user_id = $1", [
+      userId,
+    ]);
     return existing.rows[0];
   }
   return result.rows[0];
@@ -74,23 +76,42 @@ async function createSession({ userId, refreshTokenHash, ipAddress, userAgent, e
 }
 
 async function createEmailVerificationOtp({ userId, otpHash, expiresAt }) {
-  const result = await pool.query(
-    `
-      INSERT INTO email_verification_otps (user_id, otp_hash, expires_at)
-      VALUES ($1, $2, $3)
-      ON CONFLICT (user_id) WHERE consumed_at IS NULL
-      DO UPDATE
-      SET otp_hash = EXCLUDED.otp_hash,
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const result = await client.query(
+      `
+        INSERT INTO email_verification_otps (
+          user_id,
+          otp_hash,
+          expires_at,
+          attempts,
+          consumed_at,
+          created_at
+        )
+        VALUES ($1, $2, $3, 0, NULL, NOW())
+        ON CONFLICT (user_id) WHERE consumed_at IS NULL
+        DO UPDATE SET
+          otp_hash = EXCLUDED.otp_hash,
           expires_at = EXCLUDED.expires_at,
           attempts = 0,
           consumed_at = NULL,
           created_at = NOW()
-      RETURNING id, user_id, attempts, expires_at, created_at
-    `,
-    [userId, otpHash, expiresAt]
-  );
+        RETURNING id, user_id, attempts, expires_at, created_at
+      `,
+      [userId, otpHash, expiresAt]
+    );
 
-  return result.rows[0];
+    await client.query("COMMIT");
+    return result.rows[0];
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 async function findLatestActiveEmailOtpByUserId(userId) {
@@ -99,21 +120,6 @@ async function findLatestActiveEmailOtpByUserId(userId) {
       SELECT id, user_id, otp_hash, attempts, expires_at, consumed_at, created_at
       FROM email_verification_otps
       WHERE user_id = $1 AND consumed_at IS NULL
-      ORDER BY created_at DESC
-      LIMIT 1
-    `,
-    [userId]
-  );
-
-  return result.rows[0] || null;
-}
-
-async function findLatestEmailOtpByUserId(userId) {
-  const result = await pool.query(
-    `
-      SELECT id, user_id, otp_hash, attempts, expires_at, consumed_at, created_at
-      FROM email_verification_otps
-      WHERE user_id = $1
       ORDER BY created_at DESC
       LIMIT 1
     `,
@@ -170,7 +176,6 @@ module.exports = {
   createSession,
   createEmailVerificationOtp,
   findLatestActiveEmailOtpByUserId,
-  findLatestEmailOtpByUserId,
   incrementEmailOtpAttempts,
   consumeEmailOtp,
   markUserEmailVerified,
