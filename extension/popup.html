@@ -17,8 +17,8 @@
         </p>
       </div>
 
-      <button type="button" id="showSignupBtn" class="auth-cta-btn">Create Account</button>
-      <button type="button" id="showLoginBtn" class="auth-cta-btn secondary-btn">Login</button>
+      <button id="showSignupBtn">Create Account</button>
+      <button id="showLoginBtn" class="secondary-btn">Login</button>
     </div>
 
     <!-- Signup View -->
@@ -65,17 +65,8 @@
         </button>
       </div>
 
-      <button type="button" id="signupBtn" class="auth-cta-btn">Sign Up</button>
-      <button type="button" class="auth-cta-btn secondary-btn google-auth-btn js-google-auth">
-        <img
-          src="icons/google-logo.svg"
-          alt=""
-          class="google-auth-btn__logo"
-          width="23"
-          height="23"
-        />
-        <span class="google-auth-btn__label">Continue with Google</span>
-      </button>
+      <button id="signupBtn">Sign Up</button>
+      <button type="button" class="secondary-btn google-auth-btn js-google-auth">Continue with Google</button>
 
       <p class="switch-text">
         Already have an account?
@@ -124,17 +115,8 @@
         </button>
       </div>
 
-      <button type="button" id="loginBtn" class="auth-cta-btn">Login</button>
-      <button type="button" class="auth-cta-btn secondary-btn google-auth-btn js-google-auth">
-        <img
-          src="icons/google-logo.svg"
-          alt=""
-          class="google-auth-btn__logo"
-          width="23"
-          height="23"
-        />
-        <span class="google-auth-btn__label">Continue with Google</span>
-      </button>
+      <button id="loginBtn">Login</button>
+      <button type="button" class="secondary-btn google-auth-btn js-google-auth">Continue with Google</button>
 
       <p class="switch-text">
         Don’t have an account?
@@ -150,18 +132,18 @@
 
       <h2>Verify Email</h2>
 
-      <p id="otpInstructions" class="subtitle">
+      <p class="subtitle" id="otpInstructions">
         Enter the 6-digit code sent to
         <strong id="otpEmailHint">your email</strong>.
       </p>
 
       <div id="otpInputs" class="otp-input-row" aria-label="One-time password input">
-        <input type="text" class="otp-digit" inputmode="numeric" maxlength="1" autocomplete="one-time-code" aria-label="OTP digit 1 of 6" aria-describedby="otpInstructions" />
-        <input type="text" class="otp-digit" inputmode="numeric" maxlength="1" aria-label="OTP digit 2 of 6" aria-describedby="otpInstructions" />
-        <input type="text" class="otp-digit" inputmode="numeric" maxlength="1" aria-label="OTP digit 3 of 6" aria-describedby="otpInstructions" />
-        <input type="text" class="otp-digit" inputmode="numeric" maxlength="1" aria-label="OTP digit 4 of 6" aria-describedby="otpInstructions" />
-        <input type="text" class="otp-digit" inputmode="numeric" maxlength="1" aria-label="OTP digit 5 of 6" aria-describedby="otpInstructions" />
-        <input type="text" class="otp-digit" inputmode="numeric" maxlength="1" aria-label="OTP digit 6 of 6" aria-describedby="otpInstructions" />
+        <input type="text" class="otp-digit" name="otpDigit1" inputmode="numeric" maxlength="1" autocomplete="one-time-code" aria-label="OTP digit 1 of 6" aria-describedby="otpInstructions" />
+        <input type="text" class="otp-digit" name="otpDigit2" inputmode="numeric" maxlength="1" aria-label="OTP digit 2 of 6" aria-describedby="otpInstructions" />
+        <input type="text" class="otp-digit" name="otpDigit3" inputmode="numeric" maxlength="1" aria-label="OTP digit 3 of 6" aria-describedby="otpInstructions" />
+        <input type="text" class="otp-digit" name="otpDigit4" inputmode="numeric" maxlength="1" aria-label="OTP digit 4 of 6" aria-describedby="otpInstructions" />
+        <input type="text" class="otp-digit" name="otpDigit5" inputmode="numeric" maxlength="1" aria-label="OTP digit 5 of 6" aria-describedby="otpInstructions" />
+        <input type="text" class="otp-digit" name="otpDigit6" inputmode="numeric" maxlength="1" aria-label="OTP digit 6 of 6" aria-describedby="otpInstructions" />
       </div>
 
       <button id="verifyOtpBtn">Verify OTP</button>
@@ -215,7 +197,7 @@
       <button id="generateBtn">Generate Post</button>
       <div id="loading" class="loading hidden">
         <span class="spinner"></span>
-        <span id="loadingText">Generating post...</span>
+        <span>Generating post...</span>
       </div>
 
       <p class="format-toolbar-hint">Format selected text in any field below (post, hashtags, or CTA).</p>

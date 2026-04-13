@@ -188,12 +188,87 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           return;
         }
 
+        sendResponse(data);
+      })
+      .catch((error) => {
+        console.error("Signup error:", error);
+
+        sendResponse({
+          success: false,
+          message: "Could not connect to the backend server.",
+        });
+      });
+
+    return true;
+  }
+
+  if (message.type === "VERIFY_EMAIL_OTP") {
+    fetch("http://localhost:5000/api/auth/verify-email-otp", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(message.payload),
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          sendResponse({
+            success: false,
+            message: data?.message || "OTP verification failed.",
+            errors: data?.errors || null,
+          });
+          return;
+        }
+
         const token = data?.data?.token || data?.token || null;
+        const user = data?.data?.user || data?.user || null;
 
         if (!token) {
           sendResponse({
             success: false,
-            message: "Signup succeeded but no token was returned.",
+            message: "OTP verified but no token was returned.",
+          });
+          return;
+        }
+
+        chrome.storage.local.set({ authToken: token, currentUser: user }, () => {
+          sendResponse({
+            success: true,
+            message: "Email verified successfully.",
+            data,
+          });
+        });
+      })
+      .catch((error) => {
+        console.error("Verify OTP error:", error);
+
+        sendResponse({
+          success: false,
+          message: "Could not connect to the backend server.",
+        });
+      });
+
+    return true;
+  }
+
+  if (message.type === "RESEND_EMAIL_OTP") {
+    fetch("http://localhost:5000/api/auth/resend-email-otp", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(message.payload),
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          sendResponse({
+            success: false,
+            message: data?.message || "Failed to resend OTP.",
+            errors: data?.errors || null,
           });
           return;
         }
@@ -201,7 +276,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse(data);
       })
       .catch((error) => {
-        console.error("Signup error:", error);
+        console.error("Resend OTP error:", error);
 
         sendResponse({
           success: false,
