@@ -3,6 +3,11 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const env = require("../config/env");
 const {
+  readGoogleAuthConfig,
+  exchangeGoogleAuthCode,
+  verifyGoogleIdToken,
+} = require("../config/googleAuthConfig");
+const {
   validateSignup,
   validateLogin,
   validateVerifyOtp,
@@ -399,6 +404,120 @@ async function resendVerificationOtp(req, res, next) {
   }
 }
 
+// ----------------------
+// Google: Signup / Login
+// ----------------------
+/* FLOW (OAuth 2.0 auth code + PKCE + OpenID ID token):
+ * ===================================================
+ * 1) extension/manifest.json stores the "client id" (from Google Cloud OAuth).
+ * 2) extension starts Google sign-in via chrome.identity.launchWebAuthFlow
+ *    using PKCE (code_challenge) and scopes: openid email profile.
+ * 3) user signs in with Google.
+ * 4) Google redirects back to the extension with an authorization "code".
+ * 5) the extension POSTs "code", "code_verifier", and "redirect_uri" to the backend API.
+ * 6) the backend exchanges the "code" with Google's token endpoint (using PKCE).
+ * 7) Google returns an "id_token".
+ * 8) the backend verifies the "id_token" (signature, aud, iss, exp) with google-auth-library.
+ * 9) if valid, the backend extracts user info (email, name, picture).
+ * 10) the backend completes sign-in and returns app-specific auth payload to the client.
+ */
+async function googleSignupLogin(req, res, next) {
+  try {
+    const googleConfig = readGoogleAuthConfig();
+    if (!googleConfig) {
+      return res.status(503).json({
+        success: false,
+        message: "Google sign-in is not configured. Add server/google_auth.json with your OAuth client.",
+      });
+    }
+
+    const { code, code_verifier: codeVerifier, redirect_uri: redirectUri } = req.body || {};
+    if (!code || typeof code !== "string") {
+      return res.status(400).json({ success: false, message: "code is required" });
+    }
+    if (!codeVerifier || typeof codeVerifier !== "string") {
+      return res.status(400).json({ success: false, message: "code_verifier is required" });
+    }
+    if (!redirectUri || typeof redirectUri !== "string") {
+      return res.status(400).json({ success: false, message: "redirect_uri is required" });
+    }
+
+    const exchanged = await exchangeGoogleAuthCode({
+      code,
+      codeVerifier,
+      redirectUri,
+      clientId: googleConfig.clientId,
+      clientSecret: googleConfig.clientSecret,
+    });
+    if (!exchanged.ok) {
+      return res.status(401).json({ success: false, message: exchanged.message });
+    }
+
+    const verified = await verifyGoogleIdToken(exchanged.idToken, googleConfig.clientId);
+    if (!verified.ok) {
+      return res.status(401).json({ success: false, message: verified.message });
+    }
+
+    const payload = verified.payload;
+    if (!payload?.email) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Google ID token had no email claim" });
+    }
+    if (payload.email_verified === false) {
+      return res.status(401).json({ success: false, message: "Google email is not verified" });
+    }
+
+    const normalizedEmail = String(payload.email).trim().toLowerCase();
+    const fullName = (payload.name && String(payload.name).trim()) || normalizedEmail.split("@")[0];
+    const picture = payload.picture ? String(payload.picture) : null;
+
+    let user = await findUserByEmail(normalizedEmail);
+    let isNewUser = false;
+
+    if (user) {
+      if (user.auth_provider !== "google") {
+        return res.status(409).json({
+          success: false,
+          message:
+            "This email is already registered with a password. Sign in with email and password.",
+        });
+      }
+    } else {
+      isNewUser = true;
+      const randomSecret = crypto.randomBytes(32).toString("hex");
+      const passwordHash = await bcrypt.hash(randomSecret, 12);
+      user = await createUser({
+        fullName,
+        email: normalizedEmail,
+        passwordHash,
+        authProvider: "google",
+        profileImageUrl: picture,
+      });
+      await initUserPreferences(user.id);
+    }
+
+    const { token, refreshToken, session } = await createSessionAndTokens(user, req);
+
+    if (isNewUser) {
+      await logSignupEvent({ userId: user.id, sessionId: session.id, provider: "google" });
+    } else {
+      await logLoginEvent({ userId: user.id, sessionId: session.id, provider: "google" });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        token,
+        refreshToken,
+        user: { id: user.id, full_name: user.full_name, email: user.email },
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function me(req, res, next) {
   try {
     const user = await findUserById(req.user.id);
@@ -417,5 +536,6 @@ module.exports = {
   login,
   verifyEmailOtp,
   resendVerificationOtp,
+  googleSignupLogin,
   me,
 };
