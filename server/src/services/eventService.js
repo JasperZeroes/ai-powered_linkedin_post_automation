@@ -52,12 +52,13 @@ async function logPostGeneratedEvent({
   });
 }
 
-async function logDraftSavedEvent({ 
+async function logDraftSavedEvent({
   userId,
   sessionId = null,
-  draftId, 
+  draftId,
   modelName = null,
-  modelProvider = null }) {
+  modelProvider = null,
+}) {
   return logEvent({
     userId,
     sessionId,

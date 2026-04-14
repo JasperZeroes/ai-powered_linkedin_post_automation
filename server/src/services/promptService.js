@@ -151,7 +151,7 @@ function buildBulletToPostPrompt({ bullets, tone, goal }) {
 Convert the following bullet points into a structured, flowing LinkedIn post.
 
 Bullet points:
-${bullets.map(b => "- " + b).join("\n")}
+${bullets.map((b) => "- " + b).join("\n")}
 
 Tone:
 ${tone}
@@ -252,5 +252,5 @@ module.exports = {
   buildSummaryPrompt,
   buildBulletToPostPrompt,
   buildExpandPrompt,
-  buildToneShiftPrompt
+  buildToneShiftPrompt,
 };
