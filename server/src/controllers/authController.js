@@ -54,6 +54,29 @@ function generateRefreshToken() {
   return crypto.randomBytes(40).toString("hex");
 }
 
+// Helper to create a session and tokens
+async function createSessionAndTokens(user, req) {
+  const refreshToken = generateRefreshToken();
+  const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const ipAddress = req.ip || req.connection.remoteAddress;
+  const userAgent = req.headers["user-agent"] || "unknown";
+
+  const session = await createSession({
+    userId: user.id,
+    refreshTokenHash,
+    ipAddress,
+    userAgent,
+    expiresAt,
+  });
+
+  return {
+    token: signToken(user),
+    refreshToken,
+    session,
+  };
+}
+
 // -------------------------------
 // Helpers: Email OTP Verification
 // -------------------------------
@@ -86,28 +109,6 @@ function isResendRateLimited(email, ipAddress) {
   activeAttempts.push(now);
   resendAttemptStore.set(key, activeAttempts);
   return false;
-}
-
-async function createSessionAndTokens(user, req) {
-  const refreshToken = generateRefreshToken();
-  const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  const ipAddress = req.ip || req.connection.remoteAddress;
-  const userAgent = req.headers["user-agent"] || "unknown";
-
-  const session = await createSession({
-    userId: user.id,
-    refreshTokenHash,
-    ipAddress,
-    userAgent,
-    expiresAt,
-  });
-
-  return {
-    token: signToken(user),
-    refreshToken,
-    session,
-  };
 }
 
 // ------------------------------
@@ -659,6 +660,9 @@ async function googleSignupLogin(req, res, next) {
   }
 }
 
+// ------
+// Me
+// ------
 async function me(req, res, next) {
   try {
     const user = await findUserById(req.user.id);
