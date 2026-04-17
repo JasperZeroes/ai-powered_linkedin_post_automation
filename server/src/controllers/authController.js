@@ -134,6 +134,13 @@ async function signup(req, res, next) {
 
     const existing = await findUserByEmail(normalizedEmail);
     if (existing) {
+      if (existing.auth_provider === "google") {
+        return res.status(409).json({
+          success: false,
+          message: "This email is registered with Google. Use Google sign-in.",
+        });
+      }
+
       if (existing.email_verified) {
         return res.status(409).json({ success: false, message: "Email already in use" });
       }
