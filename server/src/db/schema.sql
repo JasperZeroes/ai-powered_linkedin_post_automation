@@ -113,6 +113,17 @@ CREATE TABLE IF NOT EXISTS user_preferences (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS email_verification_otps (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  otp_hash TEXT NOT NULL,
+  attempts SMALLINT NOT NULL DEFAULT 0,
+  expires_at TIMESTAMPTZ NOT NULL,
+  consumed_at TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT check_email_otp_attempts_non_negative CHECK (attempts >= 0)
+);
+
 
 -- =========================================
 -- ADDITIONAL INDEXES & TRIGGERS
@@ -123,6 +134,28 @@ CREATE INDEX IF NOT EXISTS idx_sessions_expires_at ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_usage_events_session_id ON usage_events(session_id);
 
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+CREATE INDEX IF NOT EXISTS idx_email_verification_otps_user_id ON email_verification_otps(user_id);
+CREATE INDEX IF NOT EXISTS idx_email_verification_otps_expires_at ON email_verification_otps(expires_at);
+
+WITH ranked_active_otps AS (
+  SELECT
+    id,
+    ROW_NUMBER() OVER (
+      PARTITION BY user_id
+      ORDER BY created_at DESC, id DESC
+    ) AS active_rank
+  FROM email_verification_otps
+  WHERE consumed_at IS NULL
+)
+UPDATE email_verification_otps otp
+SET consumed_at = NOW()
+FROM ranked_active_otps ranked
+WHERE otp.id = ranked.id
+  AND ranked.active_rank > 1;
+
+CREATE UNIQUE INDEX IF NOT EXISTS ux_email_verification_otps_one_active_per_user
+  ON email_verification_otps(user_id)
+  WHERE consumed_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_drafts_user_id ON drafts(user_id);
 CREATE INDEX IF NOT EXISTS idx_drafts_status ON drafts(status);

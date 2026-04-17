@@ -6,8 +6,8 @@ function authMiddleware(req, res, next) {
 
   if (!header || typeof header !== "string" || !header.startsWith("Bearer ")) {
     return res.status(401).json({
-        success: false,
-        message: "missing or invalid authorization header",
+      success: false,
+      message: "missing or invalid authorization header",
     });
   }
 
@@ -15,20 +15,20 @@ function authMiddleware(req, res, next) {
 
   try {
     const payload = jwt.verify(token, env.jwtSecret);
-    
+
     if (!payload || !payload.id) {
-        return res.status(401).json({
-            success: false,
-            message: "invalid token payload",
-        });
+      return res.status(401).json({
+        success: false,
+        message: "invalid token payload",
+      });
     }
-  
+
     req.user = payload;
     return next();
   } catch (err) {
-    return res.status(401).json({ 
-        success: false, 
-        message: "invalid or expired token",
+    return res.status(401).json({
+      success: false,
+      message: "invalid or expired token",
     });
   }
 }

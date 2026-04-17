@@ -10,9 +10,12 @@ const {
 const {
   validateSignup,
   validateLogin,
+  validateVerifyOtp,
+  validateResendOtp,
   validateForgotPassword,
   validateResetPassword,
 } = require("../validators/auth.validator");
+const { sendVerificationOtpEmail } = require("../services/emailService");
 
 // Updated repository imports based on the new schema needs
 const {
@@ -21,6 +24,11 @@ const {
   findUserById,
   createSession,
   initUserPreferences,
+  createEmailVerificationOtp,
+  findLatestActiveEmailOtpByUserId,
+  incrementEmailOtpAttempts,
+  consumeEmailOtp,
+  markUserEmailVerified,
   savePasswordResetCode,
   findUserByEmailAndResetCode,
   updateUserPassword,
@@ -29,6 +37,9 @@ const {
 const { sendPasswordResetCodeEmail } = require("../services/emailService");
 const { logSignupEvent, logLoginEvent } = require("../services/eventService");
 
+// ---------------
+// Helpers: Signup
+// ---------------
 // Helper to generate JWT access token
 function signToken(user) {
   return jwt.sign(
@@ -43,6 +54,66 @@ function generateRefreshToken() {
   return crypto.randomBytes(40).toString("hex");
 }
 
+// Helper to create a session and tokens
+async function createSessionAndTokens(user, req) {
+  const refreshToken = generateRefreshToken();
+  const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const ipAddress = req.ip || req.connection.remoteAddress;
+  const userAgent = req.headers["user-agent"] || "unknown";
+
+  const session = await createSession({
+    userId: user.id,
+    refreshTokenHash,
+    ipAddress,
+    userAgent,
+    expiresAt,
+  });
+
+  return {
+    token: signToken(user),
+    refreshToken,
+    session,
+  };
+}
+
+// -------------------------------
+// Helpers: Email OTP Verification
+// -------------------------------
+function generateOtpCode() {
+  return String(crypto.randomInt(100000, 1000000));
+}
+
+const RESEND_GENERIC_MESSAGE =
+  "If an account exists and is eligible, a verification code has been sent.";
+const OTP_RESEND_COOLDOWN_MS = (env.otpResendCooldownSeconds || 30) * 1000;
+const RESEND_WINDOW_MS = 10 * 60 * 1000;
+const MAX_RESEND_ATTEMPTS_PER_WINDOW = 5;
+const resendAttemptStore = new Map();
+
+function getRequestIp(req) {
+  return req.ip || req.connection.remoteAddress || "unknown";
+}
+
+function isResendRateLimited(email, ipAddress) {
+  const now = Date.now();
+  const key = `${email}|${ipAddress}`;
+  const attempts = resendAttemptStore.get(key) || [];
+  const activeAttempts = attempts.filter((timestamp) => now - timestamp < RESEND_WINDOW_MS);
+
+  if (activeAttempts.length >= MAX_RESEND_ATTEMPTS_PER_WINDOW) {
+    resendAttemptStore.set(key, activeAttempts);
+    return true;
+  }
+
+  activeAttempts.push(now);
+  resendAttemptStore.set(key, activeAttempts);
+  return false;
+}
+
+// ------------------------------
+// Helpers: Forgot/Reset Password
+// ------------------------------
 function generatePasswordResetCode() {
   return String(Math.floor(100000 + Math.random() * 900000)); //
 }
@@ -52,9 +123,9 @@ function generatePasswordResetCode() {
 // ------
 async function signup(req, res, next) {
   try {
-    const { full_name, email, password } = req.body;
+    const { full_name, email, password, confirm_password } = req.body;
 
-    const { isValid, errors } = validateSignup({ full_name, email, password });
+    const { isValid, errors } = validateSignup({ full_name, email, password, confirm_password });
     if (!isValid) {
       return res.status(400).json({ success: false, message: "Validation failed", errors });
     }
@@ -63,7 +134,21 @@ async function signup(req, res, next) {
 
     const existing = await findUserByEmail(normalizedEmail);
     if (existing) {
-      return res.status(409).json({ success: false, message: "Email already in use" });
+      if (existing.auth_provider === "google") {
+        return res.status(409).json({
+          success: false,
+          message: "This email is registered with Google. Use Google sign-in.",
+        });
+      }
+
+      if (existing.email_verified) {
+        return res.status(409).json({ success: false, message: "Email already in use" });
+      }
+
+      return res.status(409).json({
+        success: false,
+        message: "Email already registered but not verified. Request a new OTP.",
+      });
     }
 
     const saltRounds = 12;
@@ -79,41 +164,43 @@ async function signup(req, res, next) {
     // 2. Initialize User Preferences (New Schema)
     await initUserPreferences(user.id);
 
-    // 3. Create Session (New Schema requirement for Refresh Tokens & IP tracking)
-    const refreshToken = generateRefreshToken();
-    const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
-    const ipAddress = req.ip || req.connection.remoteAddress;
-    const userAgent = req.headers["user-agent"] || "unknown";
+    const otpCode = generateOtpCode();
+    const otpHash = await bcrypt.hash(otpCode, 10);
+    const otpExpiresAt = new Date(Date.now() + env.otpExpiryMinutes * 60 * 1000);
 
-    const session = await createSession({
+    await createEmailVerificationOtp({
       userId: user.id,
-      refreshTokenHash,
-      ipAddress,
-      userAgent,
-      expiresAt,
+      otpHash,
+      expiresAt: otpExpiresAt,
     });
 
-    // 4. Log usage event via centralized event service
+    await sendVerificationOtpEmail({
+      toEmail: user.email,
+      fullName: user.full_name,
+      otpCode,
+    });
+
+    // 3. Log usage event via centralized event service
     try {
       await logSignupEvent({
         userId: user.id,
-        sessionId: session.id,
         provider: "local",
       });
     } catch (err) {
-      return next(err);
+      console.error("Failed to log signup event:", err);
     }
-
-    const token = signToken(user);
 
     return res.status(201).json({
       success: true,
-      message: "Account created. Please log in.",
+      message: "Account created. Please verify the OTP sent to your email.",
       data: {
-        token,
-        refreshToken,
-        user: { id: user.id, full_name: user.full_name, email: user.email },
+        user: {
+          id: user.id,
+          full_name: user.full_name,
+          email: user.email,
+          email_verified: user.email_verified,
+        },
+        email_verification_required: true,
       },
     });
   } catch (err) {
@@ -141,10 +228,14 @@ async function login(req, res, next) {
       return res.status(401).json({ success: false, message: "Invalid email or password" });
     }
 
-    if (user.auth_provider === "google") {
-      return res.status(409).json({
+    if (user.account_status === "suspended") {
+      return res.status(403).json({ success: false, message: "Account is suspended" });
+    }
+
+    if (!user.email_verified || user.account_status === "pending_verification") {
+      return res.status(403).json({
         success: false,
-        message: "This account uses Google sign-in.",
+        message: "Email not verified. Verify your OTP before logging in.",
       });
     }
 
@@ -155,20 +246,7 @@ async function login(req, res, next) {
 
     // REMOVED: updateLastLoginAt(user.id) - this is now handled by usage_events
 
-    // 2. Create Session (New Schema)
-    const refreshToken = generateRefreshToken();
-    const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days from now
-    const ipAddress = req.ip || req.connection.remoteAddress;
-    const userAgent = req.headers["user-agent"] || "unknown";
-
-    const session = await createSession({
-      userId: user.id,
-      refreshTokenHash,
-      ipAddress,
-      userAgent,
-      expiresAt,
-    });
+    const { token, refreshToken, session } = await createSessionAndTokens(user, req);
 
     // 3. Log usage event via centralized event service
     try {
@@ -178,10 +256,8 @@ async function login(req, res, next) {
         provider: "local",
       });
     } catch (err) {
-      return next(err);
+      console.error("Failed to log login event:", err);
     }
-
-    const token = signToken(user);
 
     return res.status(200).json({
       success: true,
@@ -196,6 +272,183 @@ async function login(req, res, next) {
   }
 }
 
+// ----------------------
+// Email OTP Verification
+// ----------------------
+async function verifyEmailOtp(req, res, next) {
+  try {
+    const { email, otp } = req.body;
+
+    const { isValid, errors } = validateVerifyOtp({ email, otp });
+    if (!isValid) {
+      return res.status(400).json({ success: false, message: "Validation failed", errors });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const user = await findUserByEmail(normalizedEmail);
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    if (user.account_status === "suspended") {
+      return res.status(403).json({ success: false, message: "Account is suspended" });
+    }
+
+    if (user.email_verified) {
+      return res.status(200).json({
+        success: true,
+        message: "Email already verified",
+        data: {
+          user: {
+            id: user.id,
+            full_name: user.full_name,
+            email: user.email,
+            email_verified: true,
+          },
+        },
+      });
+    }
+
+    const otpRecord = await findLatestActiveEmailOtpByUserId(user.id);
+    if (!otpRecord) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP not found or already used. Request a new OTP.",
+      });
+    }
+
+    if (new Date(otpRecord.expires_at).getTime() < Date.now()) {
+      return res.status(400).json({
+        success: false,
+        message: "OTP expired. Request a new OTP.",
+      });
+    }
+
+    if (otpRecord.attempts >= 5) {
+      return res.status(429).json({
+        success: false,
+        message: "Too many failed attempts. Request a new OTP.",
+      });
+    }
+
+    const otpValid = await bcrypt.compare(otp.trim(), otpRecord.otp_hash);
+    if (!otpValid) {
+      await incrementEmailOtpAttempts(otpRecord.id);
+      return res.status(400).json({ success: false, message: "Invalid OTP" });
+    }
+
+    await consumeEmailOtp(otpRecord.id);
+    const verifiedUser = await markUserEmailVerified(user.id);
+    const { token, refreshToken, session } = await createSessionAndTokens(verifiedUser, req);
+
+    try {
+      await logLoginEvent({
+        userId: verifiedUser.id,
+        sessionId: session.id,
+        provider: "local_otp",
+      });
+    } catch (err) {
+      console.error("Failed to log login event after OTP verification:", err);
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Email verified successfully",
+      data: {
+        token,
+        refreshToken,
+        user: {
+          id: verifiedUser.id,
+          full_name: verifiedUser.full_name,
+          email: verifiedUser.email,
+          email_verified: verifiedUser.email_verified,
+        },
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function resendVerificationOtp(req, res, next) {
+  try {
+    const { email } = req.body;
+
+    const { isValid, errors } = validateResendOtp({ email });
+    if (!isValid) {
+      return res.status(400).json({ success: false, message: "Validation failed", errors });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const ipAddress = getRequestIp(req);
+
+    if (isResendRateLimited(normalizedEmail, ipAddress)) {
+      return res.status(200).json({
+        success: true,
+        message: RESEND_GENERIC_MESSAGE,
+      });
+    }
+
+    const user = await findUserByEmail(normalizedEmail);
+
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message: RESEND_GENERIC_MESSAGE,
+      });
+    }
+
+    if (user.account_status === "suspended") {
+      return res.status(403).json({ success: false, message: "Account is suspended" });
+    }
+
+    if (user.email_verified) {
+      return res.status(200).json({
+        success: true,
+        message: RESEND_GENERIC_MESSAGE,
+      });
+    }
+
+    const latestOtp = await findLatestActiveEmailOtpByUserId(user.id);
+    if (latestOtp) {
+      const issuedAt = new Date(latestOtp.created_at).getTime();
+      if (Date.now() - issuedAt < OTP_RESEND_COOLDOWN_MS) {
+        return res.status(200).json({
+          success: true,
+          message: RESEND_GENERIC_MESSAGE,
+        });
+      }
+    }
+
+    const otpCode = generateOtpCode();
+    const otpHash = await bcrypt.hash(otpCode, 10);
+    const otpExpiresAt = new Date(Date.now() + env.otpExpiryMinutes * 60 * 1000);
+
+    await createEmailVerificationOtp({
+      userId: user.id,
+      otpHash,
+      expiresAt: otpExpiresAt,
+    });
+
+    await sendVerificationOtpEmail({
+      toEmail: user.email,
+      fullName: user.full_name,
+      otpCode,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: RESEND_GENERIC_MESSAGE,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ----------------------
+// Forgot/Reset Password
+// ----------------------
 async function forgotPassword(req, res, next) {
   try {
     const { email } = req.body || {};
@@ -318,7 +571,7 @@ async function resetPassword(req, res, next) {
  * 3) user signs in with Google.
  * 4) Google redirects back to the extension with an authorization "code".
  * 5) the extension POSTs "code", "code_verifier", and "redirect_uri" to the backend API.
- * 6) the backend exchanges the "code" with Google’s token endpoint (using PKCE).
+ * 6) the backend exchanges the "code" with Google's token endpoint (using PKCE).
  * 7) Google returns an "id_token".
  * 8) the backend verifies the "id_token" (signature, aud, iss, exp) with google-auth-library.
  * 9) if valid, the backend extracts user info (email, name, picture).
@@ -330,7 +583,8 @@ async function googleSignupLogin(req, res, next) {
     if (!googleConfig) {
       return res.status(503).json({
         success: false,
-        message: "Google sign-in is not configured. Add server/google_auth.json with your OAuth client.",
+        message:
+          "Google sign-in is not configured. Add server/config/google_auth.json with your OAuth client.",
       });
     }
 
@@ -400,27 +654,13 @@ async function googleSignupLogin(req, res, next) {
       await initUserPreferences(user.id);
     }
 
-    const refreshToken = generateRefreshToken();
-    const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    const ipAddress = req.ip || req.connection.remoteAddress;
-    const userAgent = req.headers["user-agent"] || "unknown";
-
-    const session = await createSession({
-      userId: user.id,
-      refreshTokenHash,
-      ipAddress,
-      userAgent,
-      expiresAt,
-    });
+    const { token, refreshToken, session } = await createSessionAndTokens(user, req);
 
     if (isNewUser) {
       await logSignupEvent({ userId: user.id, sessionId: session.id, provider: "google" });
     } else {
       await logLoginEvent({ userId: user.id, sessionId: session.id, provider: "google" });
     }
-
-    const token = signToken(user);
 
     return res.status(200).json({
       success: true,
@@ -435,6 +675,9 @@ async function googleSignupLogin(req, res, next) {
   }
 }
 
+// ------
+// Me
+// ------
 async function me(req, res, next) {
   try {
     const user = await findUserById(req.user.id);
@@ -451,6 +694,8 @@ async function me(req, res, next) {
 module.exports = {
   signup,
   login,
+  verifyEmailOtp,
+  resendVerificationOtp,
   forgotPassword,
   resetPassword,
   googleSignupLogin,

@@ -24,7 +24,7 @@
     <!-- Signup View -->
     <div id="signupView" class="view hidden">
       <div class="top-row">
-        <button id="backFromSignup" class="text-btn">← Back</button>
+        <button id="backFromSignup" type="button" class="text-btn">← Back</button>
       </div>
 
       <h2>Create Account</h2>
@@ -65,6 +65,32 @@
         </button>
       </div>
 
+      <label for="signupConfirmPassword">Confirm Password</label>
+      <div class="password-field">
+        <input
+          type="password"
+          id="signupConfirmPassword"
+          placeholder="Confirm your password"
+          autocomplete="new-password"
+        />
+        <button
+          type="button"
+          class="password-toggle"
+          id="toggleSignupConfirmPassword"
+          aria-label="Show password"
+          aria-pressed="false"
+        >
+          <svg class="icon-eye" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+          <svg class="icon-eye-off hidden" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M17.94 17.94A10.07 10.07 0 0112 20c-7 0-11-8-11-8a18.45 18.45 0 015.06-5.94M9.9 4.24A9.12 9.12 0 0112 4c7 0 11 8 11 8a18.5 18.5 0 01-2.16 3.19m-6.72-1.07a3 3 0 11-4.24-4.24" />
+            <line x1="1" y1="1" x2="23" y2="23" />
+          </svg>
+        </button>
+      </div>
+
       <button type="button" id="signupBtn" class="auth-cta-btn">Sign Up</button>
       <button type="button" class="auth-cta-btn secondary-btn google-auth-btn js-google-auth">
         <img
@@ -86,7 +112,7 @@
     <!-- Login View -->
     <div id="loginView" class="view hidden">
       <div class="top-row">
-        <button id="backFromLogin" class="text-btn">← Back</button>
+        <button id="backFromLogin" type="button" class="text-btn">← Back</button>
       </div>
 
       <h2>Login</h2>
@@ -146,10 +172,41 @@
       </p>
     </div>
 
+    <!-- OTP Verification View -->
+    <div id="otpView" class="view hidden">
+      <div class="top-row">
+        <button id="backFromOtp" type="button" class="text-btn">← Back</button>
+      </div>
+
+      <h2>Verify Email</h2>
+
+      <p class="subtitle" id="otpInstructions">
+        Enter the 6-digit code sent to
+        <strong id="otpEmailHint">your email</strong>.
+      </p>
+
+      <div id="otpInputs" class="otp-input-row" aria-label="One-time password input">
+        <input type="text" class="otp-digit" name="otpDigit1" inputmode="numeric" maxlength="1" autocomplete="one-time-code" aria-label="OTP digit 1 of 6" aria-describedby="otpInstructions" />
+        <input type="text" class="otp-digit" name="otpDigit2" inputmode="numeric" maxlength="1" aria-label="OTP digit 2 of 6" aria-describedby="otpInstructions" />
+        <input type="text" class="otp-digit" name="otpDigit3" inputmode="numeric" maxlength="1" aria-label="OTP digit 3 of 6" aria-describedby="otpInstructions" />
+        <input type="text" class="otp-digit" name="otpDigit4" inputmode="numeric" maxlength="1" aria-label="OTP digit 4 of 6" aria-describedby="otpInstructions" />
+        <input type="text" class="otp-digit" name="otpDigit5" inputmode="numeric" maxlength="1" aria-label="OTP digit 5 of 6" aria-describedby="otpInstructions" />
+        <input type="text" class="otp-digit" name="otpDigit6" inputmode="numeric" maxlength="1" aria-label="OTP digit 6 of 6" aria-describedby="otpInstructions" />
+      </div>
+
+      <button id="verifyOtpBtn" type="button" class="auth-cta-btn">Verify OTP</button>
+      <button id="resendOtpBtn" type="button" class="auth-cta-btn secondary-btn">Resend OTP</button>
+
+      <p class="switch-text">
+        Wrong email?
+        <span id="goBackToSignupFromOtp">Go back</span>
+      </p>
+    </div>
+
     <!-- Forgot Password View -->
     <div id="forgotPasswordView" class="view hidden">
       <div class="top-row">
-        <button id="backFromForgotPassword" class="text-btn">← Back</button>
+        <button id="backFromForgotPassword" type="button" class="text-btn">← Back</button>
       </div>
 
       <h2>Forgot Password</h2>
@@ -179,7 +236,7 @@
     <!-- Reset Password View -->
     <div id="resetPasswordView" class="view hidden">
       <div class="top-row">
-        <button id="backFromResetPassword" class="text-btn">← Back</button>
+        <button id="backFromResetPassword" type="button" class="text-btn">← Back</button>
       </div>
 
       <h2>Reset Password</h2>

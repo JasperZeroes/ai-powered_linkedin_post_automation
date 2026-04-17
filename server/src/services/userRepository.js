@@ -4,15 +4,36 @@ async function createUser({
   fullName,
   email,
   passwordHash,
-  authProvider = "local",
+  authProvider = "local", // can be local or google
   profileImageUrl = null,
 }) {
+  // if local: default to pending_verification, else google: active
+  const accountStatus = authProvider === "local" ? "pending_verification" : "active";
+  // if local: default to false, else google: true
+  const emailVerified = authProvider === "local" ? false : true;
+
   const query = `
-    INSERT INTO users (full_name, email, password_hash, auth_provider, profile_image_url)
-    VALUES ($1, $2, $3, $4, $5)
-    RETURNING id, full_name, email, auth_provider, created_at
+    INSERT INTO users (
+      full_name,
+      email,
+      password_hash,
+      account_status,
+      email_verified,
+      auth_provider,
+      profile_image_url
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    RETURNING id, full_name, email, account_status, email_verified, auth_provider, created_at
   `;
-  const values = [fullName, email, passwordHash, authProvider, profileImageUrl];
+  const values = [
+    fullName,
+    email,
+    passwordHash,
+    accountStatus,
+    emailVerified,
+    authProvider,
+    profileImageUrl,
+  ];
   const result = await pool.query(query, values);
   return result.rows[0];
 }
@@ -55,7 +76,9 @@ async function initUserPreferences(userId) {
   const result = await pool.query(query, [userId]);
 
   if (result.rows.length === 0) {
-    const existing = await pool.query("SELECT * FROM user_preferences WHERE user_id = $1", [userId]);
+    const existing = await pool.query("SELECT * FROM user_preferences WHERE user_id = $1", [
+      userId,
+    ]);
     return existing.rows[0];
   }
 
@@ -71,6 +94,101 @@ async function createSession({ userId, refreshTokenHash, ipAddress, userAgent, e
   const values = [userId, refreshTokenHash, ipAddress, userAgent, expiresAt];
   const result = await pool.query(query, values);
   return result.rows[0];
+}
+
+async function createEmailVerificationOtp({ userId, otpHash, expiresAt }) {
+  const client = await pool.connect();
+
+  try {
+    await client.query("BEGIN");
+
+    const result = await client.query(
+      `
+        INSERT INTO email_verification_otps (
+          user_id,
+          otp_hash,
+          expires_at,
+          attempts,
+          consumed_at,
+          created_at
+        )
+        VALUES ($1, $2, $3, 0, NULL, NOW())
+        ON CONFLICT (user_id) WHERE consumed_at IS NULL
+        DO UPDATE SET
+          otp_hash = EXCLUDED.otp_hash,
+          expires_at = EXCLUDED.expires_at,
+          attempts = 0,
+          consumed_at = NULL,
+          created_at = NOW()
+        RETURNING id, user_id, attempts, expires_at, created_at
+      `,
+      [userId, otpHash, expiresAt]
+    );
+
+    await client.query("COMMIT");
+    return result.rows[0];
+  } catch (error) {
+    await client.query("ROLLBACK");
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+async function findLatestActiveEmailOtpByUserId(userId) {
+  const result = await pool.query(
+    `
+      SELECT id, user_id, otp_hash, attempts, expires_at, consumed_at, created_at
+      FROM email_verification_otps
+      WHERE user_id = $1 AND consumed_at IS NULL
+      ORDER BY created_at DESC
+      LIMIT 1
+    `,
+    [userId]
+  );
+
+  return result.rows[0] || null;
+}
+
+async function incrementEmailOtpAttempts(otpId) {
+  await pool.query(
+    `
+      UPDATE email_verification_otps
+      SET attempts = attempts + 1
+      WHERE id = $1
+    `,
+    [otpId]
+  );
+}
+
+async function consumeEmailOtp(otpId) {
+  await pool.query(
+    `
+      UPDATE email_verification_otps
+      SET consumed_at = NOW()
+      WHERE id = $1
+    `,
+    [otpId]
+  );
+}
+
+async function markUserEmailVerified(userId) {
+  const result = await pool.query(
+    `
+      UPDATE users
+      SET email_verified = TRUE,
+          account_status = CASE
+            WHEN account_status = 'pending_verification' THEN 'active'
+            ELSE account_status
+          END,
+          updated_at = NOW()
+      WHERE id = $1
+      RETURNING id, full_name, email, account_status, email_verified, created_at
+    `,
+    [userId]
+  );
+
+  return result.rows[0] || null;
 }
 
 async function savePasswordResetCode({ userId, resetCodeHash, expiresAt }) {
@@ -126,6 +244,11 @@ module.exports = {
   updateLastLoginAt,
   initUserPreferences,
   createSession,
+  createEmailVerificationOtp,
+  findLatestActiveEmailOtpByUserId,
+  incrementEmailOtpAttempts,
+  consumeEmailOtp,
+  markUserEmailVerified,
   savePasswordResetCode,
   findUserByEmailAndResetCode,
   updateUserPassword,

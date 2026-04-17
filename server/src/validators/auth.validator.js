@@ -23,6 +23,12 @@ function validateSignup(data) {
     errors.password = "Password must be at least 8 characters";
   }
 
+  if (!data.confirm_password || typeof data.confirm_password !== "string") {
+    errors.confirm_password = "Password confirmation is required";
+  } else if (data.password !== data.confirm_password) {
+    errors.confirm_password = "Passwords do not match";
+  }
+
   return {
     isValid: Object.keys(errors).length === 0,
     errors,
@@ -40,6 +46,42 @@ function validateLogin(data) {
 
   if (!data.password || typeof data.password !== "string") {
     errors.password = "Password is required";
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+  };
+}
+
+function validateVerifyOtp(data) {
+  const errors = {};
+
+  if (!data.email || typeof data.email !== "string" || !data.email.trim()) {
+    errors.email = "Email is required";
+  } else if (!isValidEmail(data.email.trim())) {
+    errors.email = "Email is invalid";
+  }
+
+  if (!data.otp || typeof data.otp !== "string" || !data.otp.trim()) {
+    errors.otp = "OTP is required";
+  } else if (!/^\d{6}$/.test(data.otp.trim())) {
+    errors.otp = "OTP must be a 6-digit code";
+  }
+
+  return {
+    isValid: Object.keys(errors).length === 0,
+    errors,
+  };
+}
+
+function validateResendOtp(data) {
+  const errors = {};
+
+  if (!data.email || typeof data.email !== "string" || !data.email.trim()) {
+    errors.email = "Email is required";
+  } else if (!isValidEmail(data.email.trim())) {
+    errors.email = "Email is invalid";
   }
 
   return {
@@ -93,6 +135,8 @@ function validateResetPassword(data) {
 module.exports = {
   validateSignup,
   validateLogin,
+  validateVerifyOtp,
+  validateResendOtp,
   validateForgotPassword,
   validateResetPassword,
 };

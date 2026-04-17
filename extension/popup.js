@@ -29,6 +29,7 @@ const logoutBtn = document.getElementById("logoutBtn");
 const authChoiceView = document.getElementById("authChoiceView");
 const signupView = document.getElementById("signupView");
 const loginView = document.getElementById("loginView");
+const otpView = document.getElementById("otpView");
 const generatorView = document.getElementById("generatorView");
 const forgotPasswordView = document.getElementById("forgotPasswordView");
 const resetPasswordView = document.getElementById("resetPasswordView");
@@ -40,8 +41,10 @@ const showSignupBtn = document.getElementById("showSignupBtn");
 const showLoginBtn = document.getElementById("showLoginBtn");
 const backFromSignup = document.getElementById("backFromSignup");
 const backFromLogin = document.getElementById("backFromLogin");
+const backFromOtp = document.getElementById("backFromOtp");
 const goToLoginFromSignup = document.getElementById("goToLoginFromSignup");
 const goToSignupFromLogin = document.getElementById("goToSignupFromLogin");
+const goBackToSignupFromOtp = document.getElementById("goBackToSignupFromOtp");
 const goToForgotPassword = document.getElementById("goToForgotPassword");
 const backFromForgotPassword = document.getElementById("backFromForgotPassword");
 const goToResetPasswordView = document.getElementById("goToResetPasswordView");
@@ -52,6 +55,8 @@ const backFromResetPassword = document.getElementById("backFromResetPassword");
 // =========================
 const signupBtn = document.getElementById("signupBtn");
 const loginBtn = document.getElementById("loginBtn");
+const verifyOtpBtn = document.getElementById("verifyOtpBtn");
+const resendOtpBtn = document.getElementById("resendOtpBtn");
 const sendResetCodeBtn = document.getElementById("sendResetCodeBtn");
 const resetPasswordBtn = document.getElementById("resetPasswordBtn");
 
@@ -61,11 +66,16 @@ const resetPasswordBtn = document.getElementById("resetPasswordBtn");
 const signupName = document.getElementById("signupName");
 const signupEmail = document.getElementById("signupEmail");
 const signupPassword = document.getElementById("signupPassword");
+const signupConfirmPassword = document.getElementById("signupConfirmPassword");
 
 const loginEmail = document.getElementById("loginEmail");
 const loginPassword = document.getElementById("loginPassword");
 const toggleSignupPassword = document.getElementById("toggleSignupPassword");
+const toggleSignupConfirmPassword = document.getElementById("toggleSignupConfirmPassword");
 const toggleLoginPassword = document.getElementById("toggleLoginPassword");
+const otpEmailHint = document.getElementById("otpEmailHint");
+const otpInputs = Array.from(document.querySelectorAll(".otp-digit"));
+const RESEND_COOLDOWN_SECONDS = 30;
 
 const forgotPasswordEmail = document.getElementById("forgotPasswordEmail");
 const resetPasswordEmail = document.getElementById("resetPasswordEmail");
@@ -75,8 +85,10 @@ const confirmNewPassword = document.getElementById("confirmNewPassword");
 const toggleNewPassword = document.getElementById("toggleNewPassword");
 const toggleConfirmNewPassword = document.getElementById("toggleConfirmNewPassword");
 
-
-
+// =======
+// Helpers
+// =======
+// ==== auth helpers ====
 function setupPasswordToggle(toggleBtn, inputEl) {
   if (!toggleBtn || !inputEl) return;
 
@@ -95,23 +107,134 @@ function setupPasswordToggle(toggleBtn, inputEl) {
 }
 
 setupPasswordToggle(toggleSignupPassword, signupPassword);
+setupPasswordToggle(toggleSignupConfirmPassword, signupConfirmPassword);
 setupPasswordToggle(toggleLoginPassword, loginPassword);
 setupPasswordToggle(toggleNewPassword, newPassword);
 setupPasswordToggle(toggleConfirmNewPassword, confirmNewPassword);
 
-let lastFocusedFormatField = output;
+let pendingVerificationEmail = "";
+let resendCooldownTimer = null;
+let resendCooldownRemaining = 0;
+let uiLoading = false;
 
-[output, hashtagsOutput, ctaOutput].forEach((el) => {
-  if (!el) return;
-  el.addEventListener("focusin", () => {
-    lastFocusedFormatField = el;
+function updateResendOtpButton() {
+  if (!resendOtpBtn) {
+    return;
+  }
+
+  resendOtpBtn.disabled = uiLoading || resendCooldownRemaining > 0;
+
+  if (resendCooldownRemaining > 0) {
+    resendOtpBtn.textContent = `Resend OTP (${resendCooldownRemaining}s)`;
+  } else {
+    resendOtpBtn.textContent = "Resend OTP";
+  }
+}
+
+function startResendCooldown(seconds = RESEND_COOLDOWN_SECONDS) {
+  resendCooldownRemaining = seconds;
+  updateResendOtpButton();
+
+  if (resendCooldownTimer) {
+    clearInterval(resendCooldownTimer);
+    resendCooldownTimer = null;
+  }
+
+  resendCooldownTimer = setInterval(() => {
+    resendCooldownRemaining = Math.max(0, resendCooldownRemaining - 1);
+    updateResendOtpButton();
+
+    if (resendCooldownRemaining === 0) {
+      clearInterval(resendCooldownTimer);
+      resendCooldownTimer = null;
+    }
+  }, 1000);
+}
+
+function setPendingVerificationEmail(email) {
+  pendingVerificationEmail = email || "";
+  if (otpEmailHint) {
+    otpEmailHint.textContent = pendingVerificationEmail || "your email";
+  }
+}
+
+function getOtpCode() {
+  return otpInputs.map((input) => input.value).join("");
+}
+
+function clearOtpInputs() {
+  otpInputs.forEach((input) => {
+    input.value = "";
   });
-  el.addEventListener("keydown", handleFormatFieldKeydown);
-});
 
-// =========================
-// Helpers
-// =========================
+  if (otpInputs[0]) {
+    otpInputs[0].focus();
+  }
+}
+
+function setupOtpInputs() {
+  if (!otpInputs.length) {
+    return;
+  }
+
+  otpInputs.forEach((input, index) => {
+    input.addEventListener("input", (event) => {
+      const value = event.target.value.replace(/\D/g, "");
+      event.target.value = value.slice(-1);
+
+      if (event.target.value && index < otpInputs.length - 1) {
+        otpInputs[index + 1].focus();
+      }
+    });
+
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Backspace" && !input.value && index > 0) {
+        otpInputs[index - 1].focus();
+      }
+    });
+
+    input.addEventListener("paste", (event) => {
+      const pasted = (event.clipboardData?.getData("text") || "").replace(/\D/g, "");
+      if (!pasted) {
+        return;
+      }
+
+      event.preventDefault();
+      const chars = pasted.slice(0, otpInputs.length).split("");
+      chars.forEach((ch, i) => {
+        if (otpInputs[i]) {
+          otpInputs[i].value = ch;
+        }
+      });
+
+      const next = Math.min(chars.length, otpInputs.length - 1);
+      otpInputs[next]?.focus();
+    });
+  });
+}
+
+setupOtpInputs();
+updateResendOtpButton();
+
+// ==== ui helpers ====
+function hideAllViews() {
+  if (authChoiceView) authChoiceView.classList.add("hidden");
+  if (signupView) signupView.classList.add("hidden");
+  if (loginView) loginView.classList.add("hidden");
+  if (otpView) otpView.classList.add("hidden");
+  if (generatorView) generatorView.classList.add("hidden");
+  if (forgotPasswordView) forgotPasswordView.classList.add("hidden");
+  if (resetPasswordView) resetPasswordView.classList.add("hidden");
+}
+
+function showView(view) {
+  hideAllViews();
+  if (view) {
+    view.classList.remove("hidden");
+  }
+  showMessage("");
+}
+
 function showMessage(message) {
   if (!messageBox) return;
   messageBox.textContent = message;
@@ -146,6 +269,8 @@ function withButtonCooldown(btn, action) {
 }
 
 function setLoading(isLoading, text = "Generating post...") {
+  uiLoading = isLoading;
+
   if (loading) {
     loading.classList.toggle("hidden", !isLoading);
   }
@@ -170,63 +295,18 @@ function setLoading(isLoading, text = "Generating post...") {
     loginBtn.disabled = isLoading;
   }
 
+  if (verifyOtpBtn) {
+    verifyOtpBtn.disabled = isLoading;
+  }
+
+  updateResendOtpButton();
+
   document.querySelectorAll(".js-google-auth").forEach((btn) => {
     btn.disabled = isLoading;
   });
 }
 
-// =========================
-// Save to local storage
-// =========================
-function saveToLocal() {
-  const backup = {
-    post: output?.value || "",
-    hashtags: hashtagsOutput?.value || "",
-    cta: ctaOutput?.value || "",
-    prompt: promptInput?.value || ""
-  };
-  localStorage.setItem("generatedPost", JSON.stringify(backup));
-}
-
-// ===========================
-// Load from local storage
-// ===========================
-function loadFromLocal() {
-  const saved = localStorage.getItem("generatedPost");
-  if (!saved) return;
-
-  try {
-    const data = JSON.parse(saved);
-    if (output) output.value = data.post || "";
-    if (hashtagsOutput) hashtagsOutput.value = data.hashtags || "";
-    if (ctaOutput) ctaOutput.value = data.cta || "";
-    if (promptInput) promptInput.value = data.prompt || "";
-  } catch (e) {
-    console.error("Failed to parse local storage", e);
-  }
-}
-
-function clearLocalSessionData() {
-  localStorage.removeItem("generatedPost");
-}
-
-function hideAllViews() {
-  if (authChoiceView) authChoiceView.classList.add("hidden");
-  if (signupView) signupView.classList.add("hidden");
-  if (loginView) loginView.classList.add("hidden");
-  if (generatorView) generatorView.classList.add("hidden");
-  if (forgotPasswordView) forgotPasswordView.classList.add("hidden");
-  if (resetPasswordView) resetPasswordView.classList.add("hidden");
-}
-
-function showView(view) {
-  hideAllViews();
-  if (view) {
-    view.classList.remove("hidden");
-  }
-  showMessage("");
-}
-
+// ==== api helpers ====
 function handleApiError(response, fallbackMessage) {
   if (!response) {
     showMessage(fallbackMessage);
@@ -247,6 +327,7 @@ function handleApiError(response, fallbackMessage) {
   return false;
 }
 
+// ==== generator helpers ====
 function formatDraftAsTxt(payload) {
   const tagsStr = Array.isArray(payload.hashtags)
     ? payload.hashtags.join(" ")
@@ -293,9 +374,17 @@ function downloadDraftTxt(payload) {
   );
 }
 
-// =========================
-// Text formatting
-// =========================
+// ==== text formatting helpers ====
+let lastFocusedFormatField = output;
+
+[output, hashtagsOutput, ctaOutput].forEach((el) => {
+  if (!el) return;
+  el.addEventListener("focusin", () => {
+    lastFocusedFormatField = el;
+  });
+  el.addEventListener("keydown", handleFormatFieldKeydown);
+});
+
 function getFormattingTarget() {
   const fields = [output, hashtagsOutput, ctaOutput].filter(Boolean);
   const active = document.activeElement;
@@ -434,9 +523,6 @@ function applyListFormat(kind) {
   return result;
 }
 
-// =========================
-// Numbered list dropdown
-// =========================
 function closeListMenu() {
   if (listMenu) {
     listMenu.classList.add("hidden");
@@ -472,6 +558,36 @@ if (listMenuBtn && listMenu) {
   document.addEventListener("click", () => {
     closeListMenu();
   });
+}
+
+// ==== storage helpers ====
+function saveToLocal() {
+  const backup = {
+    post: output?.value || "",
+    hashtags: hashtagsOutput?.value || "",
+    cta: ctaOutput?.value || "",
+    prompt: promptInput?.value || ""
+  };
+  localStorage.setItem("generatedPost", JSON.stringify(backup));
+}
+
+function loadFromLocal() {
+  const saved = localStorage.getItem("generatedPost");
+  if (!saved) return;
+
+  try {
+    const data = JSON.parse(saved);
+    if (output) output.value = data.post || "";
+    if (hashtagsOutput) hashtagsOutput.value = data.hashtags || "";
+    if (ctaOutput) ctaOutput.value = data.cta || "";
+    if (promptInput) promptInput.value = data.prompt || "";
+  } catch (e) {
+    console.error("Failed to parse local storage", e);
+  }
+}
+
+function clearLocalSessionData() {
+  localStorage.removeItem("generatedPost");
 }
 
 // =========================
@@ -513,6 +629,12 @@ if (backFromLogin) {
   });
 }
 
+if (backFromOtp) {
+  backFromOtp.addEventListener("click", () => {
+    showView(loginView);
+  });
+}
+
 if (goToLoginFromSignup) {
   goToLoginFromSignup.addEventListener("click", () => {
     showView(loginView);
@@ -525,6 +647,12 @@ if (goToSignupFromLogin) {
   });
 }
 
+if (goBackToSignupFromOtp) {
+  goBackToSignupFromOtp.addEventListener("click", () => {
+    showView(signupView);
+  });
+}
+    
 if (goToForgotPassword) {
   goToForgotPassword.addEventListener("click", () => {
     showView(forgotPasswordView);
@@ -554,16 +682,22 @@ if (backFromResetPassword) {
 
 // =========================
 // Signup flow
-// After signup, move to login
+// After signup, move to OTP view
 // =========================
 if (signupBtn) {
   signupBtn.addEventListener("click", () => {
     const fullName = signupName?.value.trim();
     const email = signupEmail?.value.trim();
     const password = signupPassword?.value.trim();
+    const confirmPassword = signupConfirmPassword?.value.trim();
 
-    if (!fullName || !email || !password) {
+    if (!fullName || !email || !password || !confirmPassword) {
       showMessage("Please fill in all signup fields.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      showMessage("Passwords do not match.");
       return;
     }
 
@@ -577,6 +711,7 @@ if (signupBtn) {
           full_name: fullName,
           email,
           password,
+          confirm_password: confirmPassword,
         },
       },
       (response) => {
@@ -588,14 +723,121 @@ if (signupBtn) {
         }
 
         if (handleApiError(response, "Signup failed.")) {
+          const unverifiedExists = String(response?.message || "")
+            .toLowerCase()
+            .includes("not verified");
+          if (unverifiedExists && email) {
+            setPendingVerificationEmail(email);
+            clearOtpInputs();
+            showView(otpView);
+          }
           return;
         }
 
-        if (loginEmail) {
-          loginEmail.value = email;
+        setPendingVerificationEmail(email);
+        clearOtpInputs();
+        startResendCooldown();
+        showView(otpView);
+        showMessage("Account created. Enter the OTP sent to your email.");
+      }
+    );
+  });
+}
+
+// =========================
+// OTP verification flow
+// =========================
+if (verifyOtpBtn) {
+  verifyOtpBtn.addEventListener("click", () => {
+    const otp = getOtpCode();
+    const email = (
+      pendingVerificationEmail ||
+      signupEmail?.value ||
+      loginEmail?.value ||
+      ""
+    ).trim();
+
+    if (!email) {
+      showMessage("Enter your email first by signing up or logging in.");
+      showView(loginView);
+      return;
+    }
+
+    if (!/^\d{6}$/.test(otp)) {
+      showMessage("Please enter the 6-digit OTP code.");
+      return;
+    }
+
+    setLoading(true);
+    showMessage("");
+
+    chrome.runtime.sendMessage(
+      {
+        type: "VERIFY_EMAIL_OTP",
+        payload: {
+          email,
+          otp,
+        },
+      },
+      (response) => {
+        setLoading(false);
+
+        if (chrome.runtime.lastError) {
+          showMessage("Failed to communicate with extension background script.");
+          return;
         }
-        showMessage("Account created successfully. Please log in.");
-        showView(loginView);
+
+        if (handleApiError(response, "OTP verification failed.")) {
+          return;
+        }
+
+        showMessage("Email verified. You are now logged in.");
+        setTimeout(() => {
+          showView(generatorView);
+        }, 1500);
+      }
+    );
+  });
+}
+
+if (resendOtpBtn) {
+  resendOtpBtn.addEventListener("click", () => {
+    const email = (
+      pendingVerificationEmail ||
+      signupEmail?.value ||
+      loginEmail?.value ||
+      ""
+    ).trim();
+
+    if (!email) {
+      showMessage("Email is required to resend OTP.");
+      return;
+    }
+
+    setLoading(true);
+    showMessage("");
+
+    chrome.runtime.sendMessage(
+      {
+        type: "RESEND_EMAIL_OTP",
+        payload: {
+          email,
+        },
+      },
+      (response) => {
+        setLoading(false);
+
+        if (chrome.runtime.lastError) {
+          showMessage("Failed to communicate with extension background script.");
+          return;
+        }
+
+        if (handleApiError(response, "Failed to resend OTP.")) {
+          return;
+        }
+
+        startResendCooldown();
+        showMessage("A new OTP has been sent to your email.");
       }
     );
   });
@@ -635,6 +877,14 @@ if (loginBtn) {
         }
 
         if (handleApiError(response, "Login failed.")) {
+          const notVerified = String(response?.message || "")
+            .toLowerCase()
+            .includes("not verified");
+          if (notVerified && email) {
+            setPendingVerificationEmail(email);
+            clearOtpInputs();
+            showView(otpView);
+          }
           return;
         }
 
@@ -669,6 +919,9 @@ document.querySelectorAll(".js-google-auth").forEach((btn) => {
   });
 });
 
+// =========================
+// Logout flow
+// =========================
 if (logoutBtn) {
   logoutBtn.addEventListener("click", () => {
     const confirmed = window.confirm("Are you sure you want to logout?");
@@ -696,6 +949,7 @@ if (logoutBtn) {
 
       if (signupEmail) signupEmail.value = "";
       if (signupPassword) signupPassword.value = "";
+      if (signupConfirmPassword) signupConfirmPassword.value = "";
       if (signupName) signupName.value = "";
       if (loginEmail) loginEmail.value = "";
       if (loginPassword) loginPassword.value = "";
@@ -711,6 +965,9 @@ if (logoutBtn) {
   });
 }
 
+// =========================
+// Forgot/Reset password flow
+// =========================
 if (sendResetCodeBtn) {
   sendResetCodeBtn.addEventListener("click", () => {
     const email = forgotPasswordEmail?.value.trim();
@@ -1175,6 +1432,9 @@ function handleFormatFieldKeydown(e) {
   }
 }
 
+// =======
+// Storage
+// =======
 // auto-save when user types or edits the generated text
 [output, hashtagsOutput, ctaOutput, promptInput].forEach(el => {
   if (el) {
