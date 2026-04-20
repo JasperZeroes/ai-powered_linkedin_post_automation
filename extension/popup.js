@@ -75,8 +75,33 @@ const toggleSignupConfirmPassword = document.getElementById("toggleSignupConfirm
 const toggleLoginPassword = document.getElementById("toggleLoginPassword");
 const otpEmailHint = document.getElementById("otpEmailHint");
 const otpInputs = Array.from(document.querySelectorAll(".otp-digit"));
-const RESEND_COOLDOWN_SECONDS = 30;
+const DEFAULT_RESEND_COOLDOWN_SECONDS = 30;
+let RESEND_COOLDOWN_SECONDS = DEFAULT_RESEND_COOLDOWN_SECONDS;
 
+function getResendCooldownSeconds() {
+  return RESEND_COOLDOWN_SECONDS;
+}
+
+function syncResendCooldownSeconds(responseData) {
+  if (!responseData || typeof responseData !== "object") {
+    return RESEND_COOLDOWN_SECONDS;
+  }
+
+  const cooldownValue =
+    responseData.otp_resend_cooldown_seconds ??
+    responseData.otpResendCooldownSeconds ??
+    responseData.resend_cooldown_seconds ??
+    responseData.resendCooldownSeconds ??
+    responseData.cooldown_seconds ??
+    responseData.cooldownSeconds;
+
+  const parsedCooldown = Number(cooldownValue);
+  if (Number.isFinite(parsedCooldown) && parsedCooldown >= 0) {
+    RESEND_COOLDOWN_SECONDS = parsedCooldown;
+  }
+
+  return RESEND_COOLDOWN_SECONDS;
+}
 const forgotPasswordEmail = document.getElementById("forgotPasswordEmail");
 const resetPasswordEmail = document.getElementById("resetPasswordEmail");
 const resetPasswordCode = document.getElementById("resetPasswordCode");
